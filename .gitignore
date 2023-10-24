@@ -19,3 +19,10 @@
 
 # Go workspace file
 go.work
+
+# jetbrains IDE
+.idea/
+*.iml
+
+# logs
+*.log
