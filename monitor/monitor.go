@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/tenz-io/trackingo/common"
 	"strconv"
 	"time"
 )
@@ -153,7 +154,7 @@ func (r *Recorder) EndWithErrorOpt(err error, opt string) {
 	var code int
 
 	if err != nil {
-		var valErr *ValError
+		var valErr *common.ValError
 		if match := errors.As(err, &valErr); match {
 			code = valErr.Code
 		} else {
@@ -172,25 +173,6 @@ func (r *Recorder) EndWithCodeOpt(code int, opt string) {
 		r.singleFlight.Observe(r.ctx, r.dsCmd, code, duringMillis)
 		r.singleFlight.Decr(r.ctx, r.dsCmd, defaultCodeOk, activeKey)
 	}()
-}
-
-type ValError struct {
-	Code int
-	Err  error
-}
-
-func NewValError(code int, err error) *ValError {
-	return &ValError{
-		Code: code,
-		Err:  err,
-	}
-}
-
-func (ve *ValError) Error() string {
-	if ve.Err == nil {
-		return ""
-	}
-	return ve.Err.Error()
 }
 
 // exporter is the default implementation of SingleFlight

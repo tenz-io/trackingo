@@ -17,7 +17,7 @@ type TrafficTyp string
 type Traffic struct {
 	Typ  TrafficTyp    // Typ: type of traffic, access or request
 	Cmd  string        // Cmd: command
-	Code int64         // Code: error code
+	Code int           // Code: error code
 	Msg  string        // Msg: error message if you have
 	Cost time.Duration // Cost: elapse of processing
 	Req  any
