@@ -119,13 +119,9 @@ func (c *client) PostJson(ctx context.Context, url string, headers, params map[s
 	if err != nil {
 		return nil, fmt.Errorf("error sending POST request: %w", err)
 	}
-	//defer func() {
-	//	_ = resp.Body.Close()
-	//}()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response with status: %d", resp.StatusCode)
-	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	respContent, err = io.ReadAll(resp.Body)
 	if err != nil {
