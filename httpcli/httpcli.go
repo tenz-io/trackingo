@@ -7,6 +7,7 @@ import (
 	"github.com/tenz-io/trackingo/common"
 	"github.com/tenz-io/trackingo/logger"
 	"github.com/tenz-io/trackingo/monitor"
+	"github.com/tenz-io/trackingo/util"
 	"io"
 	"net/http"
 	"time"
@@ -53,6 +54,13 @@ func WithMetrics(enable bool) Option {
 
 func WithTrace(enable bool) Option {
 	return func(hc *httpClient) {
+		hc.enableTrace = enable
+	}
+}
+
+func WithTracking(enable bool) Option {
+	return func(hc *httpClient) {
+		hc.enableMetrics = enable
 		hc.enableTrace = enable
 	}
 }
@@ -135,20 +143,22 @@ func (hc *httpClient) PostJson(ctx context.Context, url string, headers, params 
 
 func (hc *httpClient) Request(ctx context.Context, req *http.Request) (resp *http.Response, err error) {
 	var (
-		begin = time.Now()
-		code  = 0
-		path  = req.URL.Path
-		rec   = monitor.BeginRecord(ctx, path)
+		begin   = time.Now()
+		code    = 0
+		path    = util.If(req.URL.Path != "", req.URL.Path, "/")
+		reqBody = util.CaptureRequest(req)
+		rec     = monitor.BeginRecord(ctx, path)
 	)
 
 	defer func() {
 		code = common.ErrorCode(err)
+		respBody := util.CaptureResponse(resp)
 		if hc.enableMetrics {
 			rec.EndWithCode(code)
 			mon := monitor.GetSingleFlight(ctx)
-			mon.Sample(ctx, path, code, float64(req.ContentLength), "reqLen")
+			mon.Sample(ctx, path, code, float64(len(reqBody)), "reqLen")
 			if resp != nil {
-				mon.Sample(ctx, path, code, float64(resp.ContentLength), "respLen")
+				mon.Sample(ctx, path, code, float64(len(respBody)), "respLen")
 			}
 
 		}
@@ -159,16 +169,17 @@ func (hc *httpClient) Request(ctx context.Context, req *http.Request) (resp *htt
 				Cost: time.Since(begin),
 				Code: common.ErrorCode(err),
 				Msg:  common.ErrorMsg(err),
+				Req:  util.ReadableHttpBody(util.RequestContentType(req), reqBody),
+				Resp: util.ReadableHttpBody(util.ResponseContentType(resp), respBody),
 			}, logger.Fields{
 				"method":     req.Method,
-				"host":       req.Host,
-				"path":       path,
+				"url":        req.URL.String(),
 				"reqHeader":  req.Header,
 				"reqQuery":   req.URL.Query(),
-				"reqLen":     req.ContentLength,
+				"reqLen":     len(reqBody),
 				"respCode":   getRespField(resp, func(resp *http.Response) any { return resp.StatusCode }),
 				"respHeader": getRespField(resp, func(resp *http.Response) any { return resp.Header }),
-				"respLen":    getRespField(resp, func(resp *http.Response) any { return resp.ContentLength }),
+				"respLen":    len(respBody),
 			})
 		}
 	}()
@@ -178,8 +189,8 @@ func (hc *httpClient) Request(ctx context.Context, req *http.Request) (resp *htt
 		return resp, common.NewValError(1, fmt.Errorf("error sending request: %w", err))
 	}
 
-	if code != http.StatusOK {
-		return resp, common.NewValError(code, fmt.Errorf("response with status: %d", code))
+	if resp.StatusCode != http.StatusOK {
+		return resp, common.NewValError(code, fmt.Errorf("response with status: %d", resp.StatusCode))
 	}
 
 	return resp, nil

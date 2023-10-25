@@ -124,7 +124,7 @@ func (le *LogTrafficEntry) clone() *LogTrafficEntry {
 }
 
 func (le *LogTrafficEntry) validate() bool {
-	if le == nil || le.dataLogger == nil {
+	if le == nil || le.dataLogger == nil || !le.allow {
 		return false
 	}
 	return true
