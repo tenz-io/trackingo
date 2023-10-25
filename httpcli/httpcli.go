@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type HttpClient interface {
+type Client interface {
 	Request(ctx context.Context, req *http.Request) (resp *http.Response, err error)
 	Head(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error)
 	Get(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error)
@@ -25,11 +25,11 @@ type HttpClient interface {
 }
 
 func NewHttpClient(
-	client *http.Client,
-	opts ...Option,
-) HttpClient {
-	hc := &httpClient{
-		client: client,
+	cli *http.Client,
+	opts Options,
+) Client {
+	hc := &client{
+		cli: cli,
 	}
 
 	for _, opt := range opts {
@@ -38,90 +38,84 @@ func NewHttpClient(
 	return hc
 }
 
-type httpClient struct {
-	client        *http.Client
+type client struct {
+	cli           *http.Client
 	enableMetrics bool
 	enableTrace   bool
 }
 
-type Option func(*httpClient)
+type Option func(*client)
+type Options []Option
 
 func WithMetrics(enable bool) Option {
-	return func(hc *httpClient) {
+	return func(hc *client) {
 		hc.enableMetrics = enable
 	}
 }
 
 func WithTrace(enable bool) Option {
-	return func(hc *httpClient) {
+	return func(hc *client) {
 		hc.enableTrace = enable
 	}
 }
 
-func WithTracking(enable bool) Option {
-	return func(hc *httpClient) {
-		hc.enableMetrics = enable
-		hc.enableTrace = enable
-	}
-}
-
-func (hc *httpClient) Head(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := hc.newRequest(ctx, http.MethodHead, url, nil, headers, params)
+func (c *client) Head(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
+	req, err := c.newRequest(ctx, http.MethodHead, url, nil, headers, params)
 	if err != nil {
 		return nil, err
 	}
 
-	return hc.Request(ctx, req)
+	return c.Request(ctx, req)
 }
 
-func (hc *httpClient) Get(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := hc.newRequest(ctx, http.MethodGet, url, nil, headers, params)
+func (c *client) Get(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
+	req, err := c.newRequest(ctx, http.MethodGet, url, nil, headers, params)
 	if err != nil {
 		return nil, err
 	}
 
-	return hc.Request(ctx, req)
+	return c.Request(ctx, req)
 }
 
-func (hc *httpClient) Patch(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := hc.newRequest(ctx, http.MethodPatch, url, nil, headers, params)
+func (c *client) Patch(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
+	req, err := c.newRequest(ctx, http.MethodPatch, url, nil, headers, params)
 	if err != nil {
 		return nil, err
 	}
 
-	return hc.Request(ctx, req)
+	return c.Request(ctx, req)
 }
 
-func (hc *httpClient) Delete(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := hc.newRequest(ctx, http.MethodDelete, url, nil, headers, params)
+func (c *client) Delete(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
+	req, err := c.newRequest(ctx, http.MethodDelete, url, nil, headers, params)
 	if err != nil {
 		return nil, err
 	}
 
-	return hc.Request(ctx, req)
+	return c.Request(ctx, req)
 }
 
-func (hc *httpClient) Post(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error) {
-	req, err := hc.newRequest(ctx, http.MethodPost, url, body, headers, params)
+func (c *client) Post(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error) {
+	req, err := c.newRequest(ctx, http.MethodPost, url, body, headers, params)
 	if err != nil {
 		return nil, err
 	}
 
-	return hc.Request(ctx, req)
+	return c.Request(ctx, req)
 }
 
-func (hc *httpClient) Put(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error) {
-	req, err := hc.newRequest(ctx, http.MethodPut, url, body, headers, params)
+func (c *client) Put(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error) {
+	req, err := c.newRequest(ctx, http.MethodPut, url, body, headers, params)
 	if err != nil {
 		return nil, err
 	}
 
-	return hc.Request(ctx, req)
+	return c.Request(ctx, req)
 }
 
-func (hc *httpClient) PostJson(ctx context.Context, url string, headers, params map[string]string, jsonBody []byte) (respContent []byte, err error) {
+func (c *client) PostJson(ctx context.Context, url string, headers, params map[string]string, jsonBody []byte) (respContent []byte, err error) {
 	body := bytes.NewBuffer(jsonBody)
-	resp, err := hc.Post(ctx, url, headers, params, body)
+	resp, err := c.Post(ctx, url, headers, params, body)
 	if err != nil {
 		return nil, fmt.Errorf("error sending POST request: %w", err)
 	}
@@ -141,7 +135,7 @@ func (hc *httpClient) PostJson(ctx context.Context, url string, headers, params 
 	return respContent, nil
 }
 
-func (hc *httpClient) Request(ctx context.Context, req *http.Request) (resp *http.Response, err error) {
+func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Response, err error) {
 	var (
 		begin   = time.Now()
 		code    = 0
@@ -153,7 +147,7 @@ func (hc *httpClient) Request(ctx context.Context, req *http.Request) (resp *htt
 	defer func() {
 		code = common.ErrorCode(err)
 		respBody := util.CaptureResponse(resp)
-		if hc.enableMetrics {
+		if c.enableMetrics {
 			rec.EndWithCode(code)
 			mon := monitor.GetSingleFlight(ctx)
 			mon.Sample(ctx, path, code, float64(len(reqBody)), "reqLen")
@@ -162,7 +156,7 @@ func (hc *httpClient) Request(ctx context.Context, req *http.Request) (resp *htt
 			}
 
 		}
-		if hc.enableTrace {
+		if c.enableTrace {
 			logger.TrafficEntryFromContext(ctx).DataWith(&logger.Traffic{
 				Typ:  logger.TrafficTypRequest,
 				Cmd:  path,
@@ -184,7 +178,7 @@ func (hc *httpClient) Request(ctx context.Context, req *http.Request) (resp *htt
 		}
 	}()
 
-	resp, err = hc.client.Do(req)
+	resp, err = c.cli.Do(req)
 	if err != nil {
 		return resp, common.NewValError(1, fmt.Errorf("error sending request: %w", err))
 	}
@@ -196,7 +190,7 @@ func (hc *httpClient) Request(ctx context.Context, req *http.Request) (resp *htt
 	return resp, nil
 }
 
-func (hc *httpClient) newRequest(ctx context.Context,
+func (c *client) newRequest(ctx context.Context,
 	method,
 	url string,
 	body io.Reader,

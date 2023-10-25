@@ -9,8 +9,11 @@ import (
 )
 
 func TestNewHttpClient(t *testing.T) {
-	t.Run("test new http client", func(t *testing.T) {
-		hc := NewHttpClient(&http.Client{}, WithTracking(true))
+	t.Run("test new http cli", func(t *testing.T) {
+		hc := NewHttpClient(&http.Client{}, Options{
+			WithMetrics(true),
+			WithTrace(true),
+		})
 
 		url := "https://www.google.com"
 		header := map[string]string{}
