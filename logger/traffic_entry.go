@@ -73,3 +73,27 @@ func convertToMessage(tb *Traffic, separator string) string {
 		tb.Msg,
 	}), separator)
 }
+
+type emptyTrafficEntry struct{}
+
+func (et *emptyTrafficEntry) Data(traffic *Traffic) {
+}
+
+func (et *emptyTrafficEntry) DataWith(traffic *Traffic, fields Fields) {
+}
+
+func (et *emptyTrafficEntry) WithFields(fields Fields) TrafficEntry {
+	return et
+}
+
+func (et *emptyTrafficEntry) WithTracing(requestId string) TrafficEntry {
+	return et
+}
+
+func (et *emptyTrafficEntry) WithIgnores(ignores ...string) TrafficEntry {
+	return et
+}
+
+func (et *emptyTrafficEntry) WithPolicy(policy Policy) TrafficEntry {
+	return et
+}

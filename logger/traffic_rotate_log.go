@@ -56,36 +56,36 @@ func DataWith(tc *Traffic, fields Fields) {
 }
 
 func WithTrafficFields(ctx context.Context, fields Fields) TrafficEntry {
-	return TrafficLoggerFromContext(ctx).WithFields(fields)
+	return TrafficEntryFromContext(ctx).WithFields(fields)
 }
 
 func WithTrafficTracing(ctx context.Context, requestId string) TrafficEntry {
-	return TrafficLoggerFromContext(ctx).WithTracing(requestId)
+	return TrafficEntryFromContext(ctx).WithTracing(requestId)
 }
 
 func WithTrafficIgnores(ctx context.Context, ignores ...string) TrafficEntry {
-	return TrafficLoggerFromContext(ctx).WithIgnores(ignores...)
+	return TrafficEntryFromContext(ctx).WithIgnores(ignores...)
 }
 
-// TrafficLoggerFromContext get traffic dataLogger from context, allows us to pass dataLogger between functions
-func TrafficLoggerFromContext(ctx context.Context) TrafficEntry {
-	data := ctx.Value(trafficLoggerCtxKey)
+// TrafficEntryFromContext get traffic dataLogger from context, allows us to pass dataLogger between functions
+func TrafficEntryFromContext(ctx context.Context) TrafficEntry {
+	data := ctx.Value(trafficLogCtxKey)
 	if data == nil {
 		return defaultTrafficLogger.clone() // prevent the user from accidentally not setting the dataLogger
 	}
 	te, ok := data.(*LogTrafficEntry)
 	if !ok {
-		return defaultTrafficLogger.clone() // prevent the user from accidentally modifying the defaultTrafficLogger
+		return &emptyTrafficEntry{}
 	}
 	return te
 }
 
-// WithTrafficLogger set given LogTrafficEntry to context by using trafficLoggerCtxKey
-func WithTrafficLogger(ctx context.Context, te TrafficEntry) context.Context {
+// WithTrafficEntry set given LogTrafficEntry to context by using trafficLogCtxKey
+func WithTrafficEntry(ctx context.Context, te TrafficEntry) context.Context {
 	if ctx == nil || te == nil {
 		return ctx
 	}
-	return context.WithValue(ctx, trafficLoggerCtxKey, te)
+	return context.WithValue(ctx, trafficLogCtxKey, te)
 }
 
 // CopyTrafficToContext copies the traffic logger from the current context to the new context
@@ -93,7 +93,7 @@ func CopyTrafficToContext(srcCtx context.Context, dstCtx context.Context) contex
 	if srcCtx == nil || dstCtx == nil {
 		return dstCtx
 	}
-	dstCtx = WithTrafficLogger(dstCtx, TrafficLoggerFromContext(srcCtx))
+	dstCtx = WithTrafficEntry(dstCtx, TrafficEntryFromContext(srcCtx))
 	return dstCtx
 }
 

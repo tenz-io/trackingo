@@ -153,7 +153,7 @@ func (hc *httpClient) Request(ctx context.Context, req *http.Request) (resp *htt
 
 		}
 		if hc.enableTrace {
-			logger.TrafficLoggerFromContext(ctx).DataWith(&logger.Traffic{
+			logger.TrafficEntryFromContext(ctx).DataWith(&logger.Traffic{
 				Typ:  logger.TrafficTypRequest,
 				Cmd:  path,
 				Cost: time.Since(begin),

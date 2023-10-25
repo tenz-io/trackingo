@@ -114,3 +114,66 @@ func longTimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	//enc.AppendString(t.Format(time.RFC3339))
 	enc.AppendString(t.Format("2006-01-02T15:04:05.000Z0700"))
 }
+
+type empty struct {
+}
+
+func (e *empty) Debug(msg string) {
+}
+
+func (e *empty) Debugf(format string, args ...any) {
+}
+
+func (e *empty) DebugWith(msg string, fields Fields) {
+}
+
+func (e *empty) Info(msg string) {
+}
+
+func (e *empty) Infof(format string, args ...any) {
+}
+
+func (e *empty) InfoWith(msg string, fields Fields) {
+}
+
+func (e *empty) Warn(msg string) {
+}
+
+func (e *empty) Warnf(format string, args ...any) {
+}
+
+func (e *empty) WarnWith(msg string, fields Fields) {
+}
+
+func (e *empty) Error(msg string) {
+}
+
+func (e *empty) Errorf(format string, args ...any) {
+}
+
+func (e *empty) ErrorWith(msg string, fields Fields) {
+}
+
+func (e *empty) WithFields(fields Fields) Entry {
+	return e
+}
+
+func (e *empty) WithField(k string, v any) Entry {
+	return e
+}
+
+func (e *empty) With(data any) Entry {
+	return e
+}
+
+func (e *empty) WithError(err error) Entry {
+	return e
+}
+
+func (e *empty) WithTracing(requestId string) Entry {
+	return e
+}
+
+func (e *empty) Enabled(level Level) bool {
+	return false
+}

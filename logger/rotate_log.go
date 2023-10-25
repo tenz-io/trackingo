@@ -18,8 +18,8 @@ const (
 type loggerCtxKeyType string
 
 const (
-	loggerCtxKey        = loggerCtxKeyType("logger_ctx_key")
-	trafficLoggerCtxKey = loggerCtxKeyType("traffic_logger_ctx_key")
+	logCtxKey        = loggerCtxKeyType("_log_ctx_key")
+	trafficLogCtxKey = loggerCtxKeyType("_traffic_log_ctx_key")
 )
 
 var (
@@ -410,13 +410,13 @@ func newEntry(config Config, infoOutput, errOutput, debugOutput zapcore.WriteSyn
 
 // FromContext get Entry from context, if not found, return default logger
 func FromContext(ctx context.Context) Entry {
-	data := ctx.Value(loggerCtxKey)
+	data := ctx.Value(logCtxKey)
 	if data == nil {
 		return defaultLogger.clone()
 	}
 	entry, ok := data.(Entry)
 	if !ok {
-		return defaultLogger.clone()
+		return &empty{}
 	}
 	return entry
 }
@@ -427,7 +427,7 @@ func WithLogger(ctx context.Context, entry Entry) context.Context {
 		return ctx
 	}
 
-	return context.WithValue(ctx, loggerCtxKey, entry)
+	return context.WithValue(ctx, logCtxKey, entry)
 }
 
 // CopyToContext copy logger from srcCtx to dstCtx
