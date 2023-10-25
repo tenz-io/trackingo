@@ -13,8 +13,10 @@ import (
 )
 
 type HttpClient interface {
+	Request(ctx context.Context, req *http.Request) (resp *http.Response, err error)
 	Head(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error)
 	Get(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error)
+	Patch(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error)
 	Post(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error)
 	Put(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error)
 	Delete(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error)
@@ -56,51 +58,57 @@ func WithTrace(enable bool) Option {
 }
 
 func (hc *httpClient) Head(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
-
+	req, err := hc.newRequest(ctx, http.MethodHead, url, nil, headers, params)
 	if err != nil {
-		return nil, fmt.Errorf("error creating HEAD request: %w", err)
+		return nil, err
 	}
 
-	return hc.doRequest(ctx, req, headers, params)
+	return hc.Request(ctx, req)
 }
 
 func (hc *httpClient) Get(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-
+	req, err := hc.newRequest(ctx, http.MethodGet, url, nil, headers, params)
 	if err != nil {
-		return nil, fmt.Errorf("error creating GET request: %w", err)
+		return nil, err
 	}
 
-	return hc.doRequest(ctx, req, headers, params)
+	return hc.Request(ctx, req)
+}
+
+func (hc *httpClient) Patch(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
+	req, err := hc.newRequest(ctx, http.MethodPatch, url, nil, headers, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return hc.Request(ctx, req)
 }
 
 func (hc *httpClient) Delete(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
-
+	req, err := hc.newRequest(ctx, http.MethodDelete, url, nil, headers, params)
 	if err != nil {
-		return nil, fmt.Errorf("error creating DELETE request: %w", err)
+		return nil, err
 	}
 
-	return hc.doRequest(ctx, req, headers, params)
+	return hc.Request(ctx, req)
 }
 
 func (hc *httpClient) Post(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, body)
+	req, err := hc.newRequest(ctx, http.MethodPost, url, body, headers, params)
 	if err != nil {
-		return nil, fmt.Errorf("error creating POST request: %w", err)
+		return nil, err
 	}
 
-	return hc.doRequest(ctx, req, headers, params)
+	return hc.Request(ctx, req)
 }
 
 func (hc *httpClient) Put(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, body)
+	req, err := hc.newRequest(ctx, http.MethodPut, url, body, headers, params)
 	if err != nil {
-		return nil, fmt.Errorf("error creating PUT request: %w", err)
+		return nil, err
 	}
 
-	return hc.doRequest(ctx, req, headers, params)
+	return hc.Request(ctx, req)
 }
 
 func (hc *httpClient) PostJson(ctx context.Context, url string, headers, params map[string]string, jsonBody []byte) (respContent []byte, err error) {
@@ -109,9 +117,9 @@ func (hc *httpClient) PostJson(ctx context.Context, url string, headers, params 
 	if err != nil {
 		return nil, fmt.Errorf("error sending POST request: %w", err)
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+	//defer func() {
+	//	_ = resp.Body.Close()
+	//}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("response with status: %d", resp.StatusCode)
@@ -125,7 +133,7 @@ func (hc *httpClient) PostJson(ctx context.Context, url string, headers, params 
 	return respContent, nil
 }
 
-func (hc *httpClient) doRequest(ctx context.Context, req *http.Request, headers, params map[string]string) (resp *http.Response, err error) {
+func (hc *httpClient) Request(ctx context.Context, req *http.Request) (resp *http.Response, err error) {
 	var (
 		begin = time.Now()
 		code  = 0
@@ -155,8 +163,8 @@ func (hc *httpClient) doRequest(ctx context.Context, req *http.Request, headers,
 				"method":     req.Method,
 				"host":       req.Host,
 				"path":       path,
-				"reqHeader":  headers,
-				"reqParams":  params,
+				"reqHeader":  req.Header,
+				"reqQuery":   req.URL.Query(),
 				"reqLen":     req.ContentLength,
 				"respCode":   getRespField(resp, func(resp *http.Response) any { return resp.StatusCode }),
 				"respHeader": getRespField(resp, func(resp *http.Response) any { return resp.Header }),
@@ -164,6 +172,30 @@ func (hc *httpClient) doRequest(ctx context.Context, req *http.Request, headers,
 			})
 		}
 	}()
+
+	resp, err = hc.client.Do(req)
+	if err != nil {
+		return resp, common.NewValError(1, fmt.Errorf("error sending request: %w", err))
+	}
+
+	if code != http.StatusOK {
+		return resp, common.NewValError(code, fmt.Errorf("response with status: %d", code))
+	}
+
+	return resp, nil
+}
+
+func (hc *httpClient) newRequest(ctx context.Context,
+	method,
+	url string,
+	body io.Reader,
+	headers,
+	params map[string]string,
+) (req *http.Request, err error) {
+	req, err = http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("error creating %s request: %w", method, err)
+	}
 
 	for k, v := range headers {
 		req.Header.Add(k, v)
@@ -177,16 +209,7 @@ func (hc *httpClient) doRequest(ctx context.Context, req *http.Request, headers,
 		req.URL.RawQuery = q.Encode()
 	}
 
-	resp, err = hc.client.Do(req)
-	if err != nil {
-		return resp, common.NewValError(1, fmt.Errorf("error sending request: %w", err))
-	}
-
-	if code != http.StatusOK {
-		return resp, common.NewValError(code, fmt.Errorf("response with status: %d", code))
-	}
-
-	return resp, nil
+	return req, nil
 }
 
 func getRespField(resp *http.Response, fn func(*http.Response) any) any {
