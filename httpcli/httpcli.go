@@ -13,8 +13,13 @@ import (
 	"time"
 )
 
-type Params map[string][]string
-type Headers map[string]string
+type (
+	Params  map[string][]string
+	Headers map[string]string
+
+	Option  func(*client)
+	Options []Option
+)
 
 type Client interface {
 	// Request sends an HTTP request and returns an HTTP response, following
@@ -50,9 +55,6 @@ type client struct {
 	enableMetrics bool
 	enableTrace   bool
 }
-
-type Option func(*client)
-type Options []Option
 
 func WithMetrics(enable bool) Option {
 	return func(hc *client) {
