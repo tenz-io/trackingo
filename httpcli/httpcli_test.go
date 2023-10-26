@@ -2,7 +2,6 @@ package httpcli
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -17,23 +16,17 @@ func TestNewHttpClient(t *testing.T) {
 
 		url := "https://www.google.com"
 		header := map[string]string{}
-		params := map[string]string{
-			"q": "test",
+		params := map[string][]string{
+			"q": {"golang"},
 		}
 
-		resp, err := hc.Get(context.Background(), url, header, params)
+		respBody, err := hc.Get(context.Background(), url, params, header)
 		if err != nil {
 			t.Errorf("error sending GET request: %v", err)
 			return
 		}
 
-		content, err := io.ReadAll(resp.Body)
-		if err != nil {
-			t.Errorf("error reading response body: %v", err)
-			return
-		}
-
-		t.Logf("response content: %s", content)
+		t.Logf("response content: %s", respBody)
 		time.Sleep(time.Second)
 
 	})

@@ -3,7 +3,6 @@ package httpcli
 import (
 	"context"
 	"github.com/stretchr/testify/mock"
-	"io"
 	"net/http"
 )
 
@@ -19,80 +18,61 @@ func (m *MockClient) InjectBehavior(mfn func(*MockClient)) *MockClient {
 func (m *MockClient) Request(ctx context.Context, req *http.Request) (resp *http.Response, err error) {
 	args := m.Called(ctx, req)
 
-	if args.Get(0) == nil {
-		return nil, nil
+	if args.Get(0) != nil {
+		resp = args.Get(0).(*http.Response)
 	}
 
-	return args.Get(0).(*http.Response), args.Error(1)
-}
+	err = args.Error(1)
 
-func (m *MockClient) Head(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	args := m.Called(ctx, url, headers, params)
-
-	if args.Get(0) == nil {
-		return nil, nil
-	}
-
-	return args.Get(0).(*http.Response), args.Error(1)
-}
-
-func (m *MockClient) Get(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	args := m.Called(ctx, url, headers, params)
-
-	if args.Get(0) == nil {
-		return nil, nil
-	}
-
-	return args.Get(0).(*http.Response), args.Error(1)
-}
-
-func (m *MockClient) Patch(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	args := m.Called(ctx, url, headers, params)
-
-	if args.Get(0) == nil {
-		return nil, nil
-	}
-
-	return args.Get(0).(*http.Response), args.Error(1)
-}
-
-func (m *MockClient) Post(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error) {
-	args := m.Called(ctx, url, headers, params, body)
-
-	if args.Get(0) == nil {
-		return nil, nil
-	}
-
-	return args.Get(0).(*http.Response), args.Error(1)
+	return
 
 }
 
-func (m *MockClient) Put(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error) {
-	args := m.Called(ctx, url, headers, params, body)
+func (m *MockClient) Head(ctx context.Context, url string, params Params, headers Headers) (err error) {
+	args := m.Called(ctx, url, params, headers)
 
-	if args.Get(0) == nil {
-		return nil, nil
-	}
+	err = args.Error(0)
 
-	return args.Get(0).(*http.Response), args.Error(1)
+	return
 }
 
-func (m *MockClient) Delete(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	args := m.Called(ctx, url, headers, params)
+func (m *MockClient) Delete(ctx context.Context, url string, params Params, headers Headers) (err error) {
+	args := m.Called(ctx, url, params, headers)
 
-	if args.Get(0) == nil {
-		return nil, nil
-	}
+	err = args.Error(0)
 
-	return args.Get(0).(*http.Response), args.Error(1)
+	return
 }
 
-func (m *MockClient) PostJson(ctx context.Context, url string, headers, params map[string]string, jsonBody []byte) (respContent []byte, err error) {
-	args := m.Called(ctx, url, headers, params, jsonBody)
+func (m *MockClient) Get(ctx context.Context, url string, params Params, headers Headers) (respBody []byte, err error) {
+	args := m.Called(ctx, url, params, headers)
 
-	if args.Get(0) == nil {
-		return nil, nil
+	if args.Get(0) != nil {
+		respBody = args.Get(0).([]byte)
 	}
+	err = args.Error(1)
 
-	return args.Get(0).([]byte), args.Error(1)
+	return
+}
+
+func (m *MockClient) Post(ctx context.Context, url string, params Params, headers Headers, reqBody []byte) (respBody []byte, err error) {
+	args := m.Called(ctx, url, params, headers, reqBody)
+
+	if args.Get(0) != nil {
+		respBody = args.Get(0).([]byte)
+	}
+	err = args.Error(1)
+
+	return
+}
+
+func (m *MockClient) Put(ctx context.Context, url string, params Params, headers Headers, reqBody []byte) (respBody []byte, err error) {
+	args := m.Called(ctx, url, params, headers, reqBody)
+
+	if args.Get(0) != nil {
+		respBody = args.Get(0).([]byte)
+	}
+	err = args.Error(1)
+
+	return
 }

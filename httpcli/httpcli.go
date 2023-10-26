@@ -13,15 +13,22 @@ import (
 	"time"
 )
 
+type Params map[string][]string
+type Headers map[string]string
+
 type Client interface {
+	// Request sends an HTTP request and returns an HTTP response, following
 	Request(ctx context.Context, req *http.Request) (resp *http.Response, err error)
-	Head(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error)
-	Get(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error)
-	Patch(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error)
-	Post(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error)
-	Put(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error)
-	Delete(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error)
-	PostJson(ctx context.Context, url string, headers, params map[string]string, jsonBody []byte) (respContent []byte, err error)
+	// Head sends a HEAD request and returns the response.
+	Head(ctx context.Context, url string, params Params, headers Headers) (err error)
+	// Delete sends a DELETE request and returns the response.
+	Delete(ctx context.Context, url string, params Params, headers Headers) (err error)
+	// Get sends a GET request and returns the response body as a byte slice.
+	Get(ctx context.Context, url string, params Params, headers Headers) (respBody []byte, err error)
+	// Post sends a POST request and returns the response body as a byte slice.
+	Post(ctx context.Context, url string, params Params, headers Headers, reqBody []byte) (respBody []byte, err error)
+	// Put sends a PUT request and returns the response body as a byte slice.
+	Put(ctx context.Context, url string, params Params, headers Headers, reqBody []byte) (respBody []byte, err error)
 }
 
 func NewHttpClient(
@@ -59,85 +66,100 @@ func WithTrace(enable bool) Option {
 	}
 }
 
-func (c *client) Head(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := c.newRequest(ctx, http.MethodHead, url, nil, headers, params)
+func (c *client) Head(
+	ctx context.Context,
+	url string,
+	params Params,
+	headers Headers,
+) (err error) {
+	req, err := c.newRequest(ctx, http.MethodHead, url, params, headers, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.Request(ctx, req)
+	return err
+}
+
+func (c *client) Delete(
+	ctx context.Context,
+	url string,
+	params Params,
+	headers Headers,
+) (err error) {
+	req, err := c.newRequest(ctx, http.MethodDelete, url, params, headers, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.Request(ctx, req)
+	return err
+}
+
+func (c *client) Get(
+	ctx context.Context,
+	url string,
+	params Params,
+	headers Headers,
+) (respBody []byte, err error) {
+	req, err := c.newRequest(ctx, http.MethodGet, url, params, headers, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.Request(ctx, req)
-}
-
-func (c *client) Get(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := c.newRequest(ctx, http.MethodGet, url, nil, headers, params)
+	resp, err := c.Request(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.Request(ctx, req)
+	return c.readResponseBody(resp)
 }
 
-func (c *client) Patch(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := c.newRequest(ctx, http.MethodPatch, url, nil, headers, params)
+func (c *client) Post(
+	ctx context.Context,
+	url string,
+	params Params,
+	headers Headers,
+	reqBody []byte,
+) (respBody []byte, err error) {
+	req, err := c.newRequest(ctx, http.MethodPost, url, params, headers, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return nil, err
 	}
 
-	return c.Request(ctx, req)
+	resp, err := c.Request(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return c.readResponseBody(resp)
 }
 
-func (c *client) Delete(ctx context.Context, url string, headers, params map[string]string) (resp *http.Response, err error) {
-	req, err := c.newRequest(ctx, http.MethodDelete, url, nil, headers, params)
+func (c *client) Put(
+	ctx context.Context,
+	url string,
+	params Params,
+	headers Headers,
+	reqBody []byte,
+) (respBody []byte, err error) {
+	req, err := c.newRequest(ctx, http.MethodPut, url, params, headers, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return nil, err
 	}
 
-	return c.Request(ctx, req)
-}
-
-func (c *client) Post(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error) {
-	req, err := c.newRequest(ctx, http.MethodPost, url, body, headers, params)
+	resp, err := c.Request(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-
-	return c.Request(ctx, req)
-}
-
-func (c *client) Put(ctx context.Context, url string, headers, params map[string]string, body io.Reader) (resp *http.Response, err error) {
-	req, err := c.newRequest(ctx, http.MethodPut, url, body, headers, params)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.Request(ctx, req)
-}
-
-func (c *client) PostJson(ctx context.Context, url string, headers, params map[string]string, jsonBody []byte) (respContent []byte, err error) {
-	body := bytes.NewBuffer(jsonBody)
-	resp, err := c.Post(ctx, url, headers, params, body)
-	if err != nil {
-		return nil, fmt.Errorf("error sending POST request: %w", err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	respContent, err = io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	return respContent, nil
+	return c.readResponseBody(resp)
 }
 
 func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Response, err error) {
 	var (
 		begin   = time.Now()
 		code    = 0
-		path    = util.If(req.URL.Path != "", req.URL.Path, "/")
+		cmd     = req.Method
 		reqBody = util.CaptureRequest(req)
-		rec     = monitor.BeginRecord(ctx, path)
+		rec     = monitor.BeginRecord(ctx, cmd)
 	)
 
 	defer func() {
@@ -146,16 +168,16 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 		if c.enableMetrics {
 			rec.EndWithCode(code)
 			mon := monitor.GetSingleFlight(ctx)
-			mon.Sample(ctx, path, code, float64(len(reqBody)), "reqLen")
+			mon.Sample(ctx, cmd, code, float64(len(reqBody)), "reqLen")
 			if resp != nil {
-				mon.Sample(ctx, path, code, float64(len(respBody)), "respLen")
+				mon.Sample(ctx, cmd, code, float64(len(respBody)), "respLen")
 			}
 
 		}
 		if c.enableTrace {
 			logger.TrafficEntryFromContext(ctx).DataWith(&logger.Traffic{
 				Typ:  logger.TrafficTypRequest,
-				Cmd:  path,
+				Cmd:  cmd,
 				Cost: time.Since(begin),
 				Code: common.ErrorCode(err),
 				Msg:  common.ErrorMsg(err),
@@ -187,30 +209,48 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 }
 
 func (c *client) newRequest(ctx context.Context,
-	method,
+	method string,
 	url string,
+	params Params,
+	headers Headers,
 	body io.Reader,
-	headers,
-	params map[string]string,
 ) (req *http.Request, err error) {
 	req, err = http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("error creating %s request: %w", method, err)
 	}
 
-	for k, v := range headers {
-		req.Header.Add(k, v)
-	}
-
 	if len(params) > 0 {
 		q := req.URL.Query()
-		for k, v := range params {
-			q.Add(k, v)
+		for k, vars := range params {
+			for _, v := range vars {
+				q.Add(k, v)
+			}
 		}
 		req.URL.RawQuery = q.Encode()
 	}
 
+	for k, v := range headers {
+		req.Header.Add(k, v)
+	}
+
 	return req, nil
+}
+
+func (c *client) readResponseBody(resp *http.Response) ([]byte, error) {
+	if resp == nil || resp.Body == nil {
+		return nil, fmt.Errorf("response body is nil")
+	}
+
+	bs, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	return bs, nil
 }
 
 func getRespField(resp *http.Response, fn func(*http.Response) any) any {
