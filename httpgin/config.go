@@ -7,6 +7,5 @@ type Config struct {
 	EnableMetrics     bool   `yaml:"enable_metrics" json:"enable_metrics" default:"true"`
 	EnableTraffic     bool   `yaml:"enable_traffic" json:"enable_traffic" default:"true"`
 	EnableHealthCheck bool   `yaml:"enable_health_check" json:"enable_health_check" default:"true"`
-	EnableTimeout     bool   `yaml:"enable_timeout" json:"enable_timeout" default:"true"`
-	Timeout           int    `yaml:"timeout" json:"timeout" default:"10"` // seconds
+	Timeout           int    `yaml:"timeout" json:"timeout" default:"0"` // seconds, 0 means no timeout
 }

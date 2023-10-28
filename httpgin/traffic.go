@@ -17,8 +17,7 @@ func applyTraffic(cfg *Config) gin.HandlerFunc {
 			context.Next()
 		}
 	}
-
-	syslog.Println("[middleware] apply traffic logging")
+	syslog.Println("[httpgin] apply traffic logging")
 
 	return func(c *gin.Context) {
 		ctx := RequestContext(c)

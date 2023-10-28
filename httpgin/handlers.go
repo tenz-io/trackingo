@@ -25,7 +25,6 @@ var (
 )
 
 func applyAccessLog(cfg *Config) gin.HandlerFunc {
-
 	if !cfg.EnableAccess {
 		return func(context *gin.Context) {
 			context.Next()
@@ -52,13 +51,11 @@ func applyAccessLog(cfg *Config) gin.HandlerFunc {
 }
 
 func applyMetrics(cfg *Config) gin.HandlerFunc {
-
 	if !cfg.EnableMetrics {
 		return func(c *gin.Context) {
 			c.Next()
 		}
 	}
-
 	syslog.Println("[httpgin] apply metrics")
 
 	return func(c *gin.Context) {
@@ -75,13 +72,11 @@ func applyMetrics(cfg *Config) gin.HandlerFunc {
 }
 
 func applyTimeout(cfg *Config) gin.HandlerFunc {
-
-	if !cfg.EnableTimeout || cfg.Timeout <= 0 {
+	if cfg.Timeout <= 0 {
 		return func(c *gin.Context) {
 			c.Next()
 		}
 	}
-
 	syslog.Println("[httpgin] apply timeout:", cfg.Timeout)
 
 	return func(c *gin.Context) {
@@ -122,7 +117,7 @@ func applyPanicRecovery(cfg *Config) gin.HandlerFunc {
 }
 
 func applyTracking(cfg *Config) gin.HandlerFunc {
-	syslog.Println("[middleware] apply tracking")
+	syslog.Println("[httpgin] apply tracking")
 
 	return func(c *gin.Context) {
 		url := c.Request.URL.Path
