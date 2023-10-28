@@ -319,7 +319,25 @@ func asMillis(begin time.Time) float64 {
 }
 
 // FromContext get single flight monitor from ctx
-func FromContext(ctx context.Context) (SingleFlight, error) {
+// return empty monitor if not found, always not be nil
+func FromContext(ctx context.Context) SingleFlight {
+	mon, _ := fromContext(ctx)
+	return mon
+}
+
+// HasSingleFlight check if ctx has single flight monitor
+func HasSingleFlight(ctx context.Context) bool {
+	if _, err := fromContext(ctx); err != nil {
+		return false
+	}
+	return true
+}
+
+// fromContext get single flight monitor from ctx
+// return error and empty monitor if not found
+// return empty monitor if found but wrong type
+// so this func will always return a monitor
+func fromContext(ctx context.Context) (SingleFlight, error) {
 	data := ctx.Value(singleFlightCtxKey)
 	if data == nil {
 		return &empty{}, fmt.Errorf("single flight monitor not found in the ctx")
@@ -331,21 +349,26 @@ func FromContext(ctx context.Context) (SingleFlight, error) {
 	return mon, nil
 }
 
-// GetSingleFlight get single flight monitor from ctx
-func GetSingleFlight(ctx context.Context) SingleFlight {
-	flightMonitor, _ := FromContext(ctx)
-	return flightMonitor
-}
-
-// BeginRecord start a recorder
-func BeginRecord(ctx context.Context, dsCmd string) *Recorder {
-	return GetSingleFlight(ctx).BeginRecord(ctx, dsCmd)
-}
-
 // WithMonitor inject single flight monitor to ctx
 func WithMonitor(ctx context.Context, singleFlight SingleFlight) context.Context {
 	ctx = context.WithValue(ctx, singleFlightCtxKey, singleFlight)
 	return ctx
+}
+
+// BeginRecord start a recorder
+func BeginRecord(ctx context.Context, dsCmd string) *Recorder {
+	return FromContext(ctx).BeginRecord(ctx, dsCmd)
+}
+
+// InitSingleFlight init single flight monitor in ctx
+// if ctx already has single flight monitor, return ctx directly
+func InitSingleFlight(ctx context.Context, cmd string) context.Context {
+	var mon SingleFlight
+	var err error
+	if mon, err = fromContext(ctx); err != nil {
+		mon = NewSingleFlight(cmd)
+	}
+	return WithMonitor(ctx, mon)
 }
 
 // CopyToContext copy single flight monitor from src ctx to dst ctx
@@ -354,6 +377,11 @@ func CopyToContext(srcCtx, dstCtx context.Context) context.Context {
 		return dstCtx
 	}
 
-	dstCtx = WithMonitor(dstCtx, GetSingleFlight(srcCtx))
+	singleFlight, err := fromContext(srcCtx)
+	if err != nil {
+		return srcCtx
+	}
+
+	dstCtx = WithMonitor(dstCtx, singleFlight)
 	return dstCtx
 }
