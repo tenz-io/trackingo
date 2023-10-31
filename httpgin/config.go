@@ -4,7 +4,7 @@ import "time"
 
 type Config struct {
 	EnableAccess    bool          `yaml:"enable_access" json:"enable_access" default:"true"`
-	AccessLogbase   string        `yaml:"access_log" json:"access_logbase" default:"log"`
+	AccessLogbase   string        `yaml:"access_logbase" json:"access_logbase" default:"log"`
 	EnablePprof     bool          `yaml:"enable_pprof" json:"enable_pprof" default:"true"`
 	EnableMetrics   bool          `yaml:"enable_metrics" json:"enable_metrics" default:"true"`
 	MetricsEndpoint string        `yaml:"metrics_endpoint" json:"metrics_endpoint" default:"/metrics"`
