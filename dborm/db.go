@@ -1,6 +1,7 @@
 package dborm
 
 import (
+	"context"
 	"fmt"
 	syslog "log"
 	"sync"
@@ -17,7 +18,7 @@ var (
 )
 
 type Manager interface {
-	GetDB() (*gorm.DB, error)
+	GetDB(ctx context.Context) (*gorm.DB, error)
 	Active() bool
 }
 
@@ -39,6 +40,11 @@ func NewManager(
 
 	if err := m.connect(); err != nil {
 		syslog.Println("[DB] connect database error: ", err)
+		return m, nil
+	}
+
+	if err := m.applyPlugins(); err != nil {
+		syslog.Println("[DB] apply plugins error: ", err)
 		return m, nil
 	}
 
@@ -81,7 +87,7 @@ func (m *manager) connect() (err error) {
 	return nil
 }
 
-func (m *manager) GetDB() (*gorm.DB, error) {
+func (m *manager) GetDB(ctx context.Context) (*gorm.DB, error) {
 	if m == nil {
 		return nil, fmt.Errorf("db manager is nil")
 	}
@@ -92,7 +98,8 @@ func (m *manager) GetDB() (*gorm.DB, error) {
 
 	m.lock.RLock()
 	defer m.lock.RUnlock()
-	return m.db, nil
+
+	return m.db.WithContext(ctx), nil
 }
 
 func (m *manager) Active() bool {
