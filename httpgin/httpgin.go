@@ -53,11 +53,18 @@ func (m *manager) registerEndpoints() {
 	}
 
 	if m.cfg.EnableMetrics {
-		m.engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		if m.cfg.MetricsEndpoint == "" {
+			m.cfg.MetricsEndpoint = "/metrics"
+		}
+
+		m.engine.GET(m.cfg.MetricsEndpoint, gin.WrapH(promhttp.Handler()))
 	}
 
-	if m.cfg.EnableHealthCheck {
-		m.engine.GET("/health", func(c *gin.Context) {
+	if m.cfg.EnableCheck {
+		if m.cfg.CheckEndpoint == "" {
+			m.cfg.CheckEndpoint = "/health"
+		}
+		m.engine.GET(m.cfg.CheckEndpoint, func(c *gin.Context) {
 			c.String(200, "ok")
 		})
 	}

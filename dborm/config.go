@@ -3,16 +3,16 @@ package dborm
 import "fmt"
 
 type Config struct {
-	MaxOpenConn    int    `yaml:"max_open_conn" json:"max_open_conn"`
-	MaxIdleConn    int    `yaml:"max_idle_conn" json:"max_idle_conn"`
-	MaxLifetime    int    `yaml:"max_lifetime" json:"max_lifetime"`
-	Username       string `yaml:"username" json:"username"`
-	Password       string `yaml:"password" json:"password"`
-	Dbname         string `yaml:"dbname" json:"dbname"`
-	Host           string `yaml:"host" json:"host"`
-	Port           int    `yaml:"port" json:"port"`
-	EnableTracking bool   `yaml:"enable_tracking" json:"enable_tracking"`
-	LogBase        string `yaml:"log_base" json:"log_base" default:"log"`
+	Username        string `yaml:"username" json:"username"`
+	Password        string `yaml:"password" json:"password"`
+	Dbname          string `yaml:"dbname" json:"dbname"`
+	Host            string `yaml:"host" json:"host"`
+	Port            int    `yaml:"port" json:"port"`
+	MaxOpenConn     int    `yaml:"max_open_conn" json:"max_open_conn"`
+	MaxIdleConn     int    `yaml:"max_idle_conn" json:"max_idle_conn"`
+	MaxLifetime     int    `yaml:"max_lifetime" json:"max_lifetime"`
+	EnableTracking  bool   `yaml:"enable_tracking" json:"enable_tracking"`
+	TrackingLogbase string `yaml:"tracking_logbase" json:"tracking_logbase" default:"log"`
 }
 
 func (dc *Config) GetDSN() string {

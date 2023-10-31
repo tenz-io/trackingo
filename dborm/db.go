@@ -35,7 +35,7 @@ func NewManager(
 ) (Manager, error) {
 	m := &manager{
 		cfg:      cfg,
-		dbLogger: newDBLog(cfg.LogBase),
+		dbLogger: newDBLog(cfg.TrackingLogbase),
 	}
 
 	if err := m.connect(); err != nil {

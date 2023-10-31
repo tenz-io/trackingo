@@ -31,11 +31,11 @@ func applyAccessLog(cfg *Config) gin.HandlerFunc {
 		}
 	}
 
-	if cfg.AccessLog == "" {
-		cfg.AccessLog = "log"
+	if cfg.AccessLogbase == "" {
+		cfg.AccessLogbase = "log"
 	}
 
-	filename := strings.Join([]string{cfg.AccessLog, "access.log"}, "/")
+	filename := strings.Join([]string{cfg.AccessLogbase, "access.log"}, "/")
 	syslog.Println("[httpgin] apply access log:", filename)
 
 	accessLogger := &lumberjack.Logger{
