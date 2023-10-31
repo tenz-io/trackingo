@@ -148,14 +148,14 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 		begin   = time.Now()
 		path    = req.URL.Path
 		cmd     = util.If(path == "", "/", path)
-		reqBody = capture(req.Body)
+		reqBody = captureRequest(ctx, req)
 		code    = 0
 		rec     = monitor.BeginRecord(ctx, cmd)
 	)
 
 	defer func() {
 		code = common.ErrorCode(err)
-		respBody := capture(resp.Body)
+		respBody := captureResponse(ctx, resp)
 		if c.cfg.EnableMetrics {
 			rec.EndWithCode(code)
 			mon := monitor.FromContext(ctx)
@@ -260,21 +260,47 @@ func getContentType(head http.Header) string {
 	return head.Get("Content-Type")
 }
 
-func capture(body io.ReadCloser) []byte {
-	if body == nil {
+// captureRequest capture http body from http request
+func captureRequest(ctx context.Context, req *http.Request) []byte {
+	var (
+		le = logger.FromContext(ctx)
+	)
+	if req == nil || req.Body == nil {
+		le.Info("request or request body is nil")
 		return nil
 	}
 
-	bs, err := io.ReadAll(body)
+	bs, err := io.ReadAll(req.Body)
 	if err != nil {
+		le.WithError(err).Warn("error reading request body")
 		return nil
 	}
 
-	//_ = body.Close()
+	// clone body for reset body
 	bsCopy := bytes.Clone(bs)
-	defer func() {
-		body = io.NopCloser(bytes.NewBuffer(bs))
-	}()
+	req.Body = io.NopCloser(bytes.NewBuffer(bs))
+	return bsCopy
+}
+
+// captureResponse capture response from http response
+func captureResponse(ctx context.Context, resp *http.Response) []byte {
+	var (
+		le = logger.FromContext(ctx)
+	)
+	if resp == nil || resp.Body == nil {
+		le.Info("response or response body is nil")
+		return nil
+	}
+
+	bs, err := io.ReadAll(resp.Body)
+	if err != nil {
+		le.WithError(err).Warn("error reading response body")
+		return nil
+	}
+
+	// clone body for reset body
+	bsCopy := bytes.Clone(bs)
+	resp.Body = io.NopCloser(bytes.NewBuffer(bs))
 	return bsCopy
 }
 
