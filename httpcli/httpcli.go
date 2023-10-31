@@ -311,7 +311,7 @@ func printPayload(header http.Header, payload []byte) any {
 		return reqMap
 	} else {
 		s := string(payload)
-		return util.If(len(s) > 256, s[:256]+"...", s)
+		return s
 	}
 
 }
