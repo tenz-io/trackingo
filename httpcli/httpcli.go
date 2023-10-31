@@ -18,9 +18,6 @@ import (
 type (
 	Params  map[string][]string
 	Headers map[string]string
-
-	Option  func(*client)
-	Options []Option
 )
 
 type Client interface {
@@ -39,35 +36,24 @@ type Client interface {
 }
 
 func NewHttpClient(
-	cli *http.Client,
-	opts Options,
+	cfg *Config,
 ) Client {
-	hc := &client{
-		cli: cli,
+	return &client{
+		cfg: cfg,
+		cli: &http.Client{
+			Transport: &http.Transport{
+				MaxConnsPerHost: cfg.MaxConnsPerHost,
+				IdleConnTimeout: cfg.IdleConnTimeout,
+				ReadBufferSize:  cfg.ReadBufferSize,
+			},
+			Timeout: cfg.MaxTimeout,
+		},
 	}
-
-	for _, opt := range opts {
-		opt(hc)
-	}
-	return hc
 }
 
 type client struct {
-	cli           *http.Client
-	enableMetrics bool
-	enableTrace   bool
-}
-
-func WithMetrics(enable bool) Option {
-	return func(hc *client) {
-		hc.enableMetrics = enable
-	}
-}
-
-func WithTrace(enable bool) Option {
-	return func(hc *client) {
-		hc.enableTrace = enable
-	}
+	cli *http.Client
+	cfg *Config
 }
 
 func (c *client) Head(
@@ -170,7 +156,7 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 	defer func() {
 		code = common.ErrorCode(err)
 		respBody := capture(resp.Body)
-		if c.enableMetrics {
+		if c.cfg.EnableMetrics {
 			rec.EndWithCode(code)
 			mon := monitor.FromContext(ctx)
 			mon.Sample(ctx, cmd, code, float64(len(reqBody)), "reqLen")
@@ -179,7 +165,7 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 			}
 
 		}
-		if c.enableTrace {
+		if c.cfg.EnableTraffic {
 			var (
 				respHeader http.Header
 				respCode   int
