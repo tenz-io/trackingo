@@ -3,6 +3,7 @@ package httpcli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/tenz-io/trackingo/common"
 	"github.com/tenz-io/trackingo/logger"
@@ -10,6 +11,7 @@ import (
 	"github.com/tenz-io/trackingo/util"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -158,18 +160,19 @@ func (c *client) Put(
 func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Response, err error) {
 	var (
 		begin   = time.Now()
+		path    = req.URL.Path
+		cmd     = util.If(path == "", "/", path)
+		reqBody = capture(req.Body)
 		code    = 0
-		cmd     = req.Method
-		reqBody = util.CaptureRequest(req)
 		rec     = monitor.BeginRecord(ctx, cmd)
 	)
 
 	defer func() {
 		code = common.ErrorCode(err)
-		respBody := util.CaptureResponse(resp)
+		respBody := capture(resp.Body)
 		if c.enableMetrics {
 			rec.EndWithCode(code)
-			mon := monitor.GetSingleFlight(ctx)
+			mon := monitor.FromContext(ctx)
 			mon.Sample(ctx, cmd, code, float64(len(reqBody)), "reqLen")
 			if resp != nil {
 				mon.Sample(ctx, cmd, code, float64(len(respBody)), "respLen")
@@ -177,22 +180,30 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 
 		}
 		if c.enableTrace {
+			var (
+				respHeader http.Header
+				respCode   int
+			)
+			if resp != nil {
+				respHeader = resp.Header
+				respCode = resp.StatusCode
+			}
 			logger.TrafficEntryFromContext(ctx).DataWith(&logger.Traffic{
 				Typ:  logger.TrafficTypRequest,
 				Cmd:  cmd,
 				Cost: time.Since(begin),
 				Code: common.ErrorCode(err),
 				Msg:  common.ErrorMsg(err),
-				Req:  util.ReadableHttpBody(util.RequestContentType(req), reqBody),
-				Resp: util.ReadableHttpBody(util.ResponseContentType(resp), respBody),
+				Req:  printPayload(req.Header, reqBody),
+				Resp: printPayload(respHeader, respBody),
 			}, logger.Fields{
 				"method":     req.Method,
-				"url":        req.URL.String(),
+				"reqUrl":     req.URL.String(),
 				"reqHeader":  req.Header,
 				"reqQuery":   req.URL.Query(),
 				"reqLen":     len(reqBody),
-				"respCode":   getRespField(resp, func(resp *http.Response) any { return resp.StatusCode }),
-				"respHeader": getRespField(resp, func(resp *http.Response) any { return resp.Header }),
+				"respCode":   respCode,
+				"respHeader": respHeader,
 				"respLen":    len(respBody),
 			})
 		}
@@ -255,10 +266,66 @@ func (c *client) readResponseBody(resp *http.Response) ([]byte, error) {
 	return bs, nil
 }
 
-func getRespField(resp *http.Response, fn func(*http.Response) any) any {
-	if resp == nil {
+// getContentType returns the content type of the http header.
+func getContentType(head http.Header) string {
+	if head == nil {
+		return ""
+	}
+	return head.Get("Content-Type")
+}
+
+func capture(body io.ReadCloser) []byte {
+	if body == nil {
 		return nil
 	}
 
-	return fn(resp)
+	bs, err := io.ReadAll(body)
+	if err != nil {
+		return nil
+	}
+
+	_ = body.Close()
+	bsCopy := bytes.Clone(bs)
+	defer func() {
+		body = io.NopCloser(bytes.NewBuffer(bs))
+	}()
+	return bsCopy
+}
+
+// printPayload print the payload of the http request or response.
+func printPayload(header http.Header, payload []byte) any {
+	contentType := getContentType(header)
+	if contentType == "" || len(payload) == 0 {
+		return nil
+	}
+
+	contentType = strings.ToLower(contentType)
+
+	if !(strings.HasPrefix(contentType, "application/json") ||
+		strings.HasPrefix(contentType, "application/x-www-form-urlencoded") ||
+		strings.HasPrefix(contentType, "text/xml") ||
+		strings.HasPrefix(contentType, "text/html")) {
+		// if not json, xml, form, html, return nil
+		return fmt.Sprintf("<not support contentType: %s>", contentType)
+	}
+
+	if strings.HasPrefix(contentType, "application/json") {
+		var reqMap map[string]any
+		if err := json.Unmarshal(payload, &reqMap); err != nil {
+			return nil
+		}
+
+		return reqMap
+	} else if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
+		var reqMap map[string]string
+		if err := json.Unmarshal(payload, &reqMap); err != nil {
+			return nil
+		}
+
+		return reqMap
+	} else {
+		s := string(payload)
+		return util.If(len(s) > 256, s[:256]+"...", s)
+	}
+
 }
