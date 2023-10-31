@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strings"
-	"time"
 )
 
 var (
@@ -80,7 +79,7 @@ func applyTimeout(cfg *Config) gin.HandlerFunc {
 	syslog.Println("[httpgin] apply timeout:", cfg.Timeout)
 
 	return func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(RequestContext(c), time.Second*time.Duration(cfg.Timeout))
+		ctx, cancel := context.WithTimeout(RequestContext(c), cfg.Timeout)
 		defer cancel()
 
 		doneC := make(chan struct{})
