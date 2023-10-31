@@ -270,7 +270,7 @@ func capture(body io.ReadCloser) []byte {
 		return nil
 	}
 
-	_ = body.Close()
+	//_ = body.Close()
 	bsCopy := bytes.Clone(bs)
 	defer func() {
 		body = io.NopCloser(bytes.NewBuffer(bs))
