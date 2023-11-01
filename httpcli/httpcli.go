@@ -20,15 +20,15 @@ type (
 	Headers map[string]string
 )
 
-type Sender interface {
+type sender interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-type sender struct {
+type senderImpl struct {
 	cli *http.Client
 }
 
-func (s *sender) Do(req *http.Request) (*http.Response, error) {
+func (s *senderImpl) Do(req *http.Request) (*http.Response, error) {
 	return s.cli.Do(req)
 }
 
@@ -52,7 +52,7 @@ func NewHttpClient(
 ) Client {
 	return &client{
 		cfg: cfg,
-		sender: &sender{
+		sender: &senderImpl{
 			cli: &http.Client{
 				Transport: &http.Transport{
 					MaxConnsPerHost: cfg.MaxConnsPerHost,
@@ -66,7 +66,7 @@ func NewHttpClient(
 }
 
 type client struct {
-	sender Sender
+	sender sender
 	cfg    *Config
 }
 

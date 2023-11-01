@@ -1,4 +1,5 @@
 
 .PHONY:
 mock:
-	mockery --all --inpackage --inpackage-suffix --case camel
+	find . -name '*_mock.go' -delete
+	mockery --all --inpackage --inpackage-suffix --case underscore

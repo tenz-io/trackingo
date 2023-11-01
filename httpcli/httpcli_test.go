@@ -12,7 +12,7 @@ import (
 
 func Test_client_Request(t *testing.T) {
 	type fields struct {
-		sender Sender
+		sender sender
 		cfg    *Config
 	}
 	type behavior func(fields)
@@ -31,12 +31,12 @@ func Test_client_Request(t *testing.T) {
 		{
 			name: "when sender.Do returns error then return error",
 			fields: fields{
-				sender: new(MockSender),
+				sender: new(mockSender),
 				cfg:    &Config{},
 			},
 			behavior: func(fields fields) {
 				var (
-					senderMock = fields.sender.(*MockSender)
+					senderMock = fields.sender.(*mockSender)
 				)
 
 				senderMock.On("Do", mock.Anything).Return(
