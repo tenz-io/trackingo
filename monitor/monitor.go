@@ -87,6 +87,8 @@ func init() {
 }
 
 // SingleFlight is the interface for single flight monitor
+//
+//go:generate mockery --name SingleFlight --filename singleflight_mock.go --inpackage
 type SingleFlight interface {
 	// Set in gauge
 	Set(ctx context.Context, dsCmd string, code int, val float64, opt string)
