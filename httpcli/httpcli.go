@@ -21,15 +21,15 @@ type (
 )
 
 //go:generate mockery --name sender --filename sender_mock.go --inpackage
-type sender interface {
+type Sender interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-type senderImpl struct {
+type sender struct {
 	cli *http.Client
 }
 
-func (s *senderImpl) Do(req *http.Request) (*http.Response, error) {
+func (s *sender) Do(req *http.Request) (*http.Response, error) {
 	return s.cli.Do(req)
 }
 
@@ -54,7 +54,7 @@ func NewHttpClient(
 ) Client {
 	return &client{
 		cfg: cfg,
-		sender: &senderImpl{
+		sender: &sender{
 			cli: &http.Client{
 				Transport: &http.Transport{
 					MaxConnsPerHost: cfg.MaxConnsPerHost,
@@ -68,7 +68,7 @@ func NewHttpClient(
 }
 
 type client struct {
-	sender sender
+	sender Sender
 	cfg    *Config
 }
 
