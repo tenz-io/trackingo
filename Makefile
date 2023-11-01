@@ -1,4 +1,4 @@
 
 .PHONY:
 mock:
-	mockery --all --keeptree --output mocks
+	mockery --all --inpackage --inpackage-suffix --case camel

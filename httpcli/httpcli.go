@@ -20,7 +20,6 @@ type (
 	Headers map[string]string
 )
 
-//go:generate mockery --name sender --filename sender_mock.go --inpackage
 type Sender interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -33,7 +32,6 @@ func (s *sender) Do(req *http.Request) (*http.Response, error) {
 	return s.cli.Do(req)
 }
 
-//go:generate mockery --name Client --filename client_mock.go --inpackage
 type Client interface {
 	// Request sends an HTTP request and returns an HTTP response, following
 	Request(ctx context.Context, req *http.Request) (resp *http.Response, err error)
