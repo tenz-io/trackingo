@@ -20,6 +20,7 @@ type (
 	Headers map[string]string
 )
 
+//go:generate mockery --name sender --filename sender_mock.go --inpackage
 type sender interface {
 	Do(req *http.Request) (*http.Response, error)
 }
