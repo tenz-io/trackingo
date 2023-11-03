@@ -3,6 +3,7 @@ package dborm
 import (
 	"context"
 	"fmt"
+	"gorm.io/gorm/logger"
 	syslog "log"
 	"sync"
 	"time"
@@ -56,7 +57,12 @@ func (m *manager) connect() (err error) {
 
 	dsn := m.cfg.GetDSN()
 
-	m.db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	m.db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: logger.New(
+			emptyLog{},
+			logger.Config{},
+		),
+	})
 
 	if err != nil {
 		return fmt.Errorf("open database error: %w", err)
@@ -95,4 +101,11 @@ func (m *manager) Active() bool {
 		return false
 	}
 	return m.active
+}
+
+type emptyLog struct {
+}
+
+func (_ emptyLog) Printf(format string, args ...interface{}) {
+	// ignore
 }
