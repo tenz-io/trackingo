@@ -116,7 +116,10 @@ func (m *manager) exit(dsCmd string) func(db *gorm.DB) {
 				Code: common.ErrorCode(db.Error),
 				Msg:  common.ErrorMsg(db.Error),
 				Cost: time.Since(beginTime),
-			}, logger.Fields{})
+			}, logger.Fields{
+				"sql": db.Statement.SQL.String(),
+				"val": db.Statement.Vars,
+			})
 
 		}
 

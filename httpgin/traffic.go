@@ -47,7 +47,7 @@ func applyTraffic(cfg *Config) gin.HandlerFunc {
 
 			logger.TrafficEntryFromContext(ctx).
 				DataWith(&logger.Traffic{
-					Typ:  logger.TrafficTypAccess,
+					Typ:  logger.TrafficTypAccessResp,
 					Cmd:  c.Request.URL.Path,
 					Code: c.Writer.Status(),
 					Cost: time.Since(begin),
