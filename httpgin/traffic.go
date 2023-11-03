@@ -8,7 +8,6 @@ import (
 	"io"
 	syslog "log"
 	"strings"
-	"time"
 )
 
 func applyTraffic(cfg *Config) gin.HandlerFunc {
@@ -20,23 +19,22 @@ func applyTraffic(cfg *Config) gin.HandlerFunc {
 	syslog.Println("[httpgin] apply traffic logging")
 
 	return func(c *gin.Context) {
-		ctx := RequestContext(c)
-		begin := time.Now()
+		var (
+			ctx        = RequestContext(c)
+			reqCopy    = captureRequest(c)
+			trafficRec *logger.TrafficRec
+		)
 
-		reqCopy := captureRequest(c)
-
-		logger.TrafficEntryFromContext(ctx).
-			DataWith(&logger.Traffic{
-				Typ: logger.TrafficTypAccess,
-				Cmd: c.Request.URL.Path,
-				Req: reqCopy,
-			}, logger.Fields{
-				"method":     c.Request.Method,
-				"client":     c.ClientIP(),
-				"query":      c.Request.URL.Query(),
-				"req_header": c.Request.Header,
-				"req_size":   c.Request.ContentLength,
-			})
+		trafficRec = logger.StartTrafficRec(ctx, &logger.TrafficReq{
+			Cmd: c.Request.URL.Path,
+			Req: reqCopy,
+		}, logger.Fields{
+			"method":    c.Request.Method,
+			"client":    c.ClientIP(),
+			"query":     c.Request.URL.Query(),
+			"header":    c.Request.Header,
+			"body_size": c.Request.ContentLength,
+		})
 
 		// hijack response writer
 		rw := &responseWrapper{c.Writer, bytes.NewBuffer([]byte{})}
@@ -45,18 +43,13 @@ func applyTraffic(cfg *Config) gin.HandlerFunc {
 		defer func() {
 			c.Writer = rw.ResponseWriter
 
-			logger.TrafficEntryFromContext(ctx).
-				DataWith(&logger.Traffic{
-					Typ:  logger.TrafficTypAccessResp,
-					Cmd:  c.Request.URL.Path,
-					Code: c.Writer.Status(),
-					Cost: time.Since(begin),
-					Resp: captureResponse(c, rw.buffer.Bytes()),
-				}, logger.Fields{
-					"method":    c.Request.Method,
-					"header":    c.Writer.Header(),
-					"body_size": c.Writer.Size(),
-				})
+			trafficRec.End(&logger.TrafficResp{
+				Code: c.Writer.Status(),
+				Resp: captureResponse(c, rw.buffer.Bytes()),
+			}, logger.Fields{
+				"header":    c.Writer.Header(),
+				"body_size": c.Writer.Size(),
+			})
 		}()
 
 		c.Next()

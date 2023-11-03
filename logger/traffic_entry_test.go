@@ -24,13 +24,13 @@ func Test_convertToMessage(t *testing.T) {
 			name: "when tb is not nil then return string",
 			args: args{
 				tb: &Traffic{
-					Typ: TrafficTypRequest,
+					Typ: TrafficTypReq,
 					Cmd: "test_command",
 					Req: "request body",
 				},
 				separator: "|",
 			},
-			want: "sent_to|test_command|-|-|-",
+			want: "req_to|test_command|-|-|-",
 		},
 	}
 	for _, tt := range tests {

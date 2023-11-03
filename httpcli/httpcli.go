@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 type (
@@ -176,17 +175,16 @@ func (c *client) Put(
 
 func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Response, err error) {
 	var (
-		begin   = time.Now()
-		path    = req.URL.Path
-		cmd     = util.If(path == "", "/", path)
-		reqBody = captureRequest(ctx, req)
-		code    = 0
-		rec     = monitor.BeginRecord(ctx, cmd)
+		path       = req.URL.Path
+		cmd        = util.If(path == "", "/", path)
+		reqBody    = captureRequest(ctx, req)
+		code       = 0
+		rec        = monitor.BeginRecord(ctx, cmd)
+		trafficRec *logger.TrafficRec
 	)
 
 	if c.enableTraffic {
-		logger.TrafficEntryFromContext(ctx).DataWith(&logger.Traffic{
-			Typ: logger.TrafficTypRequest,
+		trafficRec = logger.StartTrafficRec(ctx, &logger.TrafficReq{
 			Cmd: cmd,
 			Req: printPayload(req.Header, reqBody),
 		}, logger.Fields{
@@ -219,10 +217,7 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 				respHeader = resp.Header
 				respCode = resp.StatusCode
 			}
-			logger.TrafficEntryFromContext(ctx).DataWith(&logger.Traffic{
-				Typ:  logger.TrafficTypRequestResp,
-				Cmd:  cmd,
-				Cost: time.Since(begin),
+			trafficRec.End(&logger.TrafficResp{
 				Code: common.ErrorCode(err),
 				Msg:  common.ErrorMsg(err),
 				Resp: printPayload(respHeader, respBody),
@@ -231,6 +226,7 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 				"header":    respHeader,
 				"body_size": len(respBody),
 			})
+
 		}
 	}()
 

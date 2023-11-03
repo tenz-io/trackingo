@@ -6,14 +6,12 @@ import (
 	"time"
 )
 
-const (
-	TrafficTypAccess      TrafficTyp = "recv_at"
-	TrafficTypAccessResp  TrafficTyp = "resp_to"
-	TrafficTypRequest     TrafficTyp = "sent_to"
-	TrafficTypRequestResp TrafficTyp = "resp_from"
-)
-
 type TrafficTyp string
+
+const (
+	TrafficTypReq  TrafficTyp = "req_to"
+	TrafficTypResp TrafficTyp = "resp_from"
+)
 
 // Traffic is provided by user when logging
 type Traffic struct {
@@ -24,6 +22,56 @@ type Traffic struct {
 	Cost time.Duration // Cost: elapse of processing
 	Req  any
 	Resp any
+}
+
+// TrafficReq is provided by user when logging
+type TrafficReq struct {
+	Cmd string // Cmd: command
+	Req any
+}
+
+type TrafficResp struct {
+	Code int    // Code: error code
+	Msg  string // Msg: error message if you have
+	Resp any
+}
+
+type TrafficRec struct {
+	te        TrafficEntry
+	startTime time.Time
+	pairId    string
+	cmd       string
+}
+
+func newTrafficRec(te TrafficEntry, cmd, pairId string) *TrafficRec {
+	return &TrafficRec{
+		te:        te,
+		startTime: time.Now(),
+		pairId:    pairId,
+		cmd:       cmd,
+	}
+}
+
+func (t *TrafficRec) End(resp *TrafficResp, fields Fields) {
+	if t == nil || t.te == nil || resp == nil {
+		return
+	}
+
+	if fields == nil {
+		fields = make(Fields)
+	}
+
+	fields[defaultPairFieldName] = t.pairId
+
+	t.te.DataWith(&Traffic{
+		Typ:  TrafficTypResp,
+		Cmd:  t.cmd,
+		Code: resp.Code,
+		Msg:  resp.Msg,
+		Cost: time.Since(t.startTime),
+		Resp: resp.Resp,
+	}, fields)
+
 }
 
 type TrafficEntry interface {
@@ -40,6 +88,8 @@ type TrafficEntry interface {
 	// WithPolicy adds policy to traffic dataLogger
 	// disable: true: disable policy, false: enable policy
 	WithPolicy(policy Policy) TrafficEntry
+
+	Start(req *TrafficReq, fields Fields) *TrafficRec
 }
 
 func copyFields(fields Fields) Fields {
@@ -68,13 +118,13 @@ func convertToMessage(tb *Traffic, separator string) string {
 		tb.Cmd = defaultFieldOccupied
 	}
 
-	var reqTyp = tb.Typ == TrafficTypRequest || tb.Typ == TrafficTypAccess
+	var reqTyp = tb.Typ == TrafficTypReq
 
 	return strings.Join(append([]string{
 		string(tb.Typ),
 		tb.Cmd,
-		ifThen(reqTyp, defaultFieldOccupied, fmt.Sprintf("%v", tb.Cost)).(string),
-		ifThen(reqTyp, defaultFieldOccupied, fmt.Sprintf("%v", tb.Code)).(string),
+		ifThen(reqTyp, defaultFieldOccupied, fmt.Sprintf("%s", tb.Cost)).(string),
+		ifThen(reqTyp, defaultFieldOccupied, fmt.Sprintf("%d", tb.Code)).(string),
 		tb.Msg,
 	}), separator)
 }
@@ -101,4 +151,8 @@ func (et *emptyTrafficEntry) WithIgnores(ignores ...string) TrafficEntry {
 
 func (et *emptyTrafficEntry) WithPolicy(policy Policy) TrafficEntry {
 	return et
+}
+
+func (et *emptyTrafficEntry) Start(req *TrafficReq, fields Fields) *TrafficRec {
+	return nil
 }

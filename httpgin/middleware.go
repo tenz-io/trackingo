@@ -125,14 +125,14 @@ func applyTracking(cfg *Config) gin.HandlerFunc {
 		// metrics
 		ctx = monitor.InitSingleFlight(ctx, url)
 
-		traceID := traceID()
+		traceId := traceID()
 		le := logger.WithFields(logger.Fields{
 			"url": url,
-		}).WithTracing(traceID)
+		}).WithTracing(traceId)
 
 		ctx = logger.WithLogger(ctx, le)
 
-		te := logger.WithTrafficTracing(ctx, traceID).
+		te := logger.WithTrafficTracing(ctx, traceId).
 			WithFields(logger.Fields{
 				"url": url,
 			}).

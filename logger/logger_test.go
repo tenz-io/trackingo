@@ -34,7 +34,7 @@ func TestLogger(t *testing.T) {
 		})
 	})
 	Data(&Traffic{
-		Typ:  TrafficTypAccess,
+		Typ:  TrafficTypReq,
 		Cmd:  "test command",
 		Code: 200,
 		Msg:  "test message",

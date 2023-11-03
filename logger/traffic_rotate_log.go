@@ -10,6 +10,7 @@ import (
 const (
 	defaultReqFieldName  = "request"
 	defaultRespFieldName = "response"
+	defaultPairFieldName = "__pair_id"
 	defaultDataLevelName = "DATA"
 	defaultFieldOccupied = "-"
 )
@@ -86,6 +87,11 @@ func WithTrafficEntry(ctx context.Context, te TrafficEntry) context.Context {
 		return ctx
 	}
 	return context.WithValue(ctx, trafficLogCtxKey, te)
+}
+
+// StartTrafficRec starts a new traffic log entry
+func StartTrafficRec(ctx context.Context, req *TrafficReq, fields Fields) *TrafficRec {
+	return TrafficEntryFromContext(ctx).Start(req, fields)
 }
 
 // CopyTrafficToContext copies the traffic logger from the current context to the new context

@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"strings"
 )
@@ -11,6 +12,25 @@ type LogTrafficEntry struct {
 	requestId  string
 	ignores    []string
 	allow      bool // for policy use, init true
+}
+
+func (le *LogTrafficEntry) Start(req *TrafficReq, fields Fields) *TrafficRec {
+	if !le.validate() || req == nil {
+		return nil
+	}
+
+	pairId := strings.ReplaceAll(uuid.NewString(), "-", "")
+	if fields == nil {
+		fields = make(Fields)
+	}
+	fields[defaultPairFieldName] = pairId
+
+	le.DataWith(&Traffic{
+		Typ: TrafficTypReq,
+		Cmd: req.Cmd,
+		Req: req.Req,
+	}, fields)
+	return newTrafficRec(le, req.Cmd, pairId)
 }
 
 // Data Log a request
@@ -26,8 +46,12 @@ func (le *LogTrafficEntry) DataWith(tc *Traffic, fields Fields) {
 
 	newFields := copyFields(fields)
 
-	newFields[defaultReqFieldName] = tc.Req
-	newFields[defaultRespFieldName] = tc.Resp
+	if tc.Req != nil {
+		newFields[defaultReqFieldName] = tc.Req
+	}
+	if tc.Resp != nil {
+		newFields[defaultRespFieldName] = tc.Resp
+	}
 
 	// async log
 	go func() {
