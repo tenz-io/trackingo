@@ -463,3 +463,10 @@ func visibleVal(val reflect.Value) bool {
 	}
 	return displayable
 }
+
+func ifThen(cond bool, a, b any) any {
+	if cond {
+		return a
+	}
+	return b
+}

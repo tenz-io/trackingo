@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	ginFuncs = []ginFunc{
+	buildInMiddlewares = []ginFunc{
 		applyAccessLog,
 		applyTracking,
 		applyTraffic,

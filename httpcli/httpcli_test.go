@@ -12,8 +12,9 @@ import (
 
 func Test_client_Request(t *testing.T) {
 	type fields struct {
-		sender sender
-		cfg    *Config
+		sender        sender
+		enableMetrics bool
+		enableTraffic bool
 	}
 	type behavior func(fields)
 	type args struct {
@@ -31,8 +32,9 @@ func Test_client_Request(t *testing.T) {
 		{
 			name: "when sender.Do returns error then return error",
 			fields: fields{
-				sender: new(mockSender),
-				cfg:    &Config{},
+				sender:        new(mockSender),
+				enableMetrics: true,
+				enableTraffic: true,
 			},
 			behavior: func(fields fields) {
 				var (
@@ -61,8 +63,9 @@ func Test_client_Request(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &client{
-				sender: tt.fields.sender,
-				cfg:    tt.fields.cfg,
+				sender:        tt.fields.sender,
+				enableMetrics: true,
+				enableTraffic: true,
 			}
 
 			tt.behavior(tt.fields)

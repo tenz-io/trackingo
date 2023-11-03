@@ -7,8 +7,10 @@ import (
 )
 
 const (
-	TrafficTypAccess  TrafficTyp = "recv_at"
-	TrafficTypRequest TrafficTyp = "sent_to"
+	TrafficTypAccess      TrafficTyp = "recv_at"
+	TrafficTypAccessResp  TrafficTyp = "resp_to"
+	TrafficTypRequest     TrafficTyp = "sent_to"
+	TrafficTypRequestResp TrafficTyp = "resp_from"
 )
 
 type TrafficTyp string
@@ -65,11 +67,14 @@ func convertToMessage(tb *Traffic, separator string) string {
 	if tb.Cmd == "" {
 		tb.Cmd = defaultFieldOccupied
 	}
+
+	var reqTyp = tb.Typ == TrafficTypRequest || tb.Typ == TrafficTypAccess
+
 	return strings.Join(append([]string{
 		string(tb.Typ),
 		tb.Cmd,
-		fmt.Sprintf("%dms", tb.Cost.Milliseconds()),
-		fmt.Sprintf("%d", tb.Code),
+		ifThen(reqTyp, defaultFieldOccupied, fmt.Sprintf("%v", tb.Cost)).(string),
+		ifThen(reqTyp, defaultFieldOccupied, fmt.Sprintf("%v", tb.Code)).(string),
 		tb.Msg,
 	}), separator)
 }

@@ -25,6 +25,19 @@ func applyTraffic(cfg *Config) gin.HandlerFunc {
 
 		reqCopy := captureRequest(c)
 
+		logger.TrafficEntryFromContext(ctx).
+			DataWith(&logger.Traffic{
+				Typ: logger.TrafficTypAccess,
+				Cmd: c.Request.URL.Path,
+				Req: reqCopy,
+			}, logger.Fields{
+				"method":     c.Request.Method,
+				"client":     c.ClientIP(),
+				"query":      c.Request.URL.Query(),
+				"req_header": c.Request.Header,
+				"req_size":   c.Request.ContentLength,
+			})
+
 		// hijack response writer
 		rw := &responseWrapper{c.Writer, bytes.NewBuffer([]byte{})}
 		c.Writer = rw
@@ -38,16 +51,11 @@ func applyTraffic(cfg *Config) gin.HandlerFunc {
 					Cmd:  c.Request.URL.Path,
 					Code: c.Writer.Status(),
 					Cost: time.Since(begin),
-					Req:  reqCopy,
 					Resp: captureResponse(c, rw.buffer.Bytes()),
 				}, logger.Fields{
-					"method":      c.Request.Method,
-					"client":      c.ClientIP(),
-					"query":       c.Request.URL.Query(),
-					"req_header":  c.Request.Header,
-					"req_size":    c.Request.ContentLength,
-					"resp_header": c.Writer.Header(),
-					"resp_size":   c.Writer.Size(),
+					"method":    c.Request.Method,
+					"header":    c.Writer.Header(),
+					"body_size": c.Writer.Size(),
 				})
 		}()
 

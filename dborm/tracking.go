@@ -18,52 +18,52 @@ const (
 )
 
 func (m *manager) applyPlugins() (err error) {
-	err = m.db.Callback().Query().Before("*").Register("start_query_metrics", m.enterEndpoint("db_query"))
+	err = m.db.Callback().Query().Before("*").Register("start_query_metrics", m.enter("db_query"))
 	if err != nil {
 		return fmt.Errorf("register start_metrics error: %w", err)
 	}
 
-	err = m.db.Callback().Create().Before("*").Register("start_create_metrics", m.enterEndpoint("db_create"))
+	err = m.db.Callback().Create().Before("*").Register("start_create_metrics", m.enter("db_create"))
 	if err != nil {
 		return fmt.Errorf("register start_metrics error: %w", err)
 	}
 
-	err = m.db.Callback().Update().Before("*").Register("start_update_metrics", m.enterEndpoint("db_update"))
+	err = m.db.Callback().Update().Before("*").Register("start_update_metrics", m.enter("db_update"))
 	if err != nil {
 		return fmt.Errorf("register start_metrics error: %w", err)
 	}
 
-	err = m.db.Callback().Delete().Before("*").Register("start_delete_metrics", m.enterEndpoint("db_delete"))
+	err = m.db.Callback().Delete().Before("*").Register("start_delete_metrics", m.enter("db_delete"))
 	if err != nil {
 		return fmt.Errorf("register start_metrics error: %w", err)
 	}
 
-	err = m.db.Callback().Row().Before("*").Register("start_row_metrics", m.enterEndpoint("db_row"))
+	err = m.db.Callback().Row().Before("*").Register("start_row_metrics", m.enter("db_row"))
 	if err != nil {
 		return fmt.Errorf("register start_metrics error: %w", err)
 	}
 
-	err = m.db.Callback().Raw().Before("*").Register("start_raw_metrics", m.enterEndpoint("db_raw"))
+	err = m.db.Callback().Raw().Before("*").Register("start_raw_metrics", m.enter("db_raw"))
 	if err != nil {
 		return fmt.Errorf("register start_metrics error: %w", err)
 	}
 
-	err = m.db.Callback().Query().After("*").Register("end_query_metrics", m.exitEndpoint("db_query"))
+	err = m.db.Callback().Query().After("*").Register("end_query_metrics", m.exit("db_query"))
 	if err != nil {
 		return fmt.Errorf("register end_metrics error: %w", err)
 	}
 
-	err = m.db.Callback().Create().After("*").Register("end_create_metrics", m.exitEndpoint("db_create"))
+	err = m.db.Callback().Create().After("*").Register("end_create_metrics", m.exit("db_create"))
 	if err != nil {
 		return fmt.Errorf("register end_metrics error: %w", err)
 	}
 
-	err = m.db.Callback().Update().After("*").Register("end_update_metrics", m.exitEndpoint("db_update"))
+	err = m.db.Callback().Update().After("*").Register("end_update_metrics", m.exit("db_update"))
 	if err != nil {
 		return fmt.Errorf("register end_metrics error: %w", err)
 	}
 
-	err = m.db.Callback().Delete().After("*").Register("end_delete_metrics", m.exitEndpoint("db_delete"))
+	err = m.db.Callback().Delete().After("*").Register("end_delete_metrics", m.exit("db_delete"))
 	if err != nil {
 		return fmt.Errorf("register end_metrics error: %w", err)
 	}
@@ -71,8 +71,13 @@ func (m *manager) applyPlugins() (err error) {
 	return nil
 }
 
-// enterEndpoint is a callback function that will be called when the gorm
-func (_ *manager) enterEndpoint(dsCmd string) func(db *gorm.DB) {
+// enter is a callback function that will be called when the gorm
+func (m *manager) enter(dsCmd string) func(db *gorm.DB) {
+
+	if !m.cfg.EnableTracking {
+		return func(db *gorm.DB) {}
+	}
+
 	return func(db *gorm.DB) {
 		ctx := db.Statement.Context
 		beginTime := time.Now()
@@ -80,11 +85,22 @@ func (_ *manager) enterEndpoint(dsCmd string) func(db *gorm.DB) {
 		rec := monitor.BeginRecord(ctx, dsCmd)
 		ctx = context.WithValue(ctx, metricsRecordCtxKey, rec)
 		db.Statement.Context = ctx
+		logger.TrafficEntryFromContext(ctx).DataWith(&logger.Traffic{
+			Typ: logger.TrafficTypRequest,
+			Cmd: dsCmd,
+		}, logger.Fields{
+			"sql": db.Statement.SQL.String(),
+			"val": db.Statement.Vars,
+		})
 	}
 }
 
-// exitEndpoint is a callback function that will be called when the gorm
-func (_ *manager) exitEndpoint(dsCmd string) func(db *gorm.DB) {
+// exit is a callback function that will be called when the gorm
+func (m *manager) exit(dsCmd string) func(db *gorm.DB) {
+	if !m.cfg.EnableTracking {
+		return func(db *gorm.DB) {}
+	}
+
 	return func(db *gorm.DB) {
 		ctx := db.Statement.Context
 		rec, ok := ctx.Value(metricsRecordCtxKey).(*monitor.Recorder)
@@ -95,15 +111,12 @@ func (_ *manager) exitEndpoint(dsCmd string) func(db *gorm.DB) {
 		beginTime, ok := ctx.Value(beginTimeCtxKey).(time.Time)
 		if ok {
 			logger.TrafficEntryFromContext(ctx).DataWith(&logger.Traffic{
-				Typ:  logger.TrafficTypRequest,
+				Typ:  logger.TrafficTypRequestResp,
 				Cmd:  dsCmd,
 				Code: common.ErrorCode(db.Error),
 				Msg:  common.ErrorMsg(db.Error),
 				Cost: time.Since(beginTime),
-			}, logger.Fields{
-				"sql": db.Statement.SQL.String(),
-				"val": db.Statement.Vars,
-			})
+			}, logger.Fields{})
 
 		}
 

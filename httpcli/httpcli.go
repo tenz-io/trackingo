@@ -48,27 +48,43 @@ type Client interface {
 	Put(ctx context.Context, url string, params Params, headers Headers, reqBody []byte) (respBody []byte, err error)
 }
 
-func NewHttpClient(
-	cfg *Config,
+type Opt func(c *client)
+
+type Opts []Opt
+
+func NewClient(
+	cli *http.Client,
+	opts Opts,
 ) Client {
-	return &client{
-		cfg: cfg,
+	hc := &client{
 		sender: &senderImpl{
-			cli: &http.Client{
-				Transport: &http.Transport{
-					MaxConnsPerHost: cfg.MaxConnsPerHost,
-					IdleConnTimeout: cfg.IdleConnTimeout,
-					ReadBufferSize:  cfg.ReadBufferSize,
-				},
-				Timeout: cfg.MaxTimeout,
-			},
+			cli: cli,
 		},
 	}
+
+	for _, opt := range opts {
+		opt(hc)
+	}
+
+	return hc
 }
 
 type client struct {
-	sender sender
-	cfg    *Config
+	sender        sender
+	enableMetrics bool
+	enableTraffic bool
+}
+
+func WithMetrics() Opt {
+	return func(c *client) {
+		c.enableMetrics = true
+	}
+}
+
+func WithTraffic() Opt {
+	return func(c *client) {
+		c.enableTraffic = true
+	}
 }
 
 func (c *client) Head(
@@ -168,10 +184,24 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 		rec     = monitor.BeginRecord(ctx, cmd)
 	)
 
+	if c.enableTraffic {
+		logger.TrafficEntryFromContext(ctx).DataWith(&logger.Traffic{
+			Typ: logger.TrafficTypRequest,
+			Cmd: cmd,
+			Req: printPayload(req.Header, reqBody),
+		}, logger.Fields{
+			"method":    req.Method,
+			"req_url":   req.URL.String(),
+			"header":    req.Header,
+			"params":    req.URL.Query(),
+			"body_size": len(reqBody),
+		})
+	}
+
 	defer func() {
 		code = common.ErrorCode(err)
 		respBody := captureResponse(ctx, resp)
-		if c.cfg.EnableMetrics {
+		if c.enableMetrics {
 			rec.EndWithCode(code)
 			mon := monitor.FromContext(ctx)
 			mon.Sample(ctx, cmd, code, float64(len(reqBody)), "reqLen")
@@ -180,7 +210,7 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 			}
 
 		}
-		if c.cfg.EnableTraffic {
+		if c.enableTraffic {
 			var (
 				respHeader http.Header
 				respCode   int
@@ -190,22 +220,16 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 				respCode = resp.StatusCode
 			}
 			logger.TrafficEntryFromContext(ctx).DataWith(&logger.Traffic{
-				Typ:  logger.TrafficTypRequest,
+				Typ:  logger.TrafficTypRequestResp,
 				Cmd:  cmd,
 				Cost: time.Since(begin),
 				Code: common.ErrorCode(err),
 				Msg:  common.ErrorMsg(err),
-				Req:  printPayload(req.Header, reqBody),
 				Resp: printPayload(respHeader, respBody),
 			}, logger.Fields{
-				"method":     req.Method,
-				"reqUrl":     req.URL.String(),
-				"reqHeader":  req.Header,
-				"reqQuery":   req.URL.Query(),
-				"reqLen":     len(reqBody),
-				"respCode":   respCode,
-				"respHeader": respHeader,
-				"respLen":    len(respBody),
+				"code":      respCode,
+				"header":    respHeader,
+				"body_size": len(respBody),
 			})
 		}
 	}()

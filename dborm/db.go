@@ -7,10 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tenz-io/trackingo/util"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 var (
@@ -23,19 +21,17 @@ type Manager interface {
 }
 
 type manager struct {
-	cfg      *Config
-	db       *gorm.DB
-	dbLogger logger.Writer // log.Logger
-	active   bool
-	lock     sync.RWMutex
+	cfg    *Config
+	db     *gorm.DB
+	active bool
+	lock   sync.RWMutex
 }
 
 func NewManager(
 	cfg *Config,
 ) (Manager, error) {
 	m := &manager{
-		cfg:      cfg,
-		dbLogger: newDBLog(cfg.TrackingLogbase),
+		cfg: cfg,
 	}
 
 	if err := m.connect(); err != nil {
@@ -60,15 +56,7 @@ func (m *manager) connect() (err error) {
 
 	dsn := m.cfg.GetDSN()
 
-	m.db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.New(m.dbLogger, logger.Config{
-			SlowThreshold:             time.Second,
-			Colorful:                  false,
-			IgnoreRecordNotFoundError: true,
-			ParameterizedQueries:      false,
-			LogLevel:                  util.If(m.cfg.EnableTracking, logger.Info, logger.Warn),
-		}),
-	})
+	m.db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 
 	if err != nil {
 		return fmt.Errorf("open database error: %w", err)

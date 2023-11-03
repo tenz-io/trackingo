@@ -1,10 +1,10 @@
 package httpgin
 
 import (
+	"fmt"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"sync"
 )
 
 type ginFunc func(*Config) gin.HandlerFunc
@@ -12,6 +12,10 @@ type ginFunc func(*Config) gin.HandlerFunc
 type Manager interface {
 	// GetEngine returns the gin.Engine.
 	GetEngine() *gin.Engine
+	// Use adds middleware to the chain which is run before router.
+	Use(gin.HandlerFunc)
+	// Run a http server.
+	Run(addr ...string) error
 }
 
 func NewManager(cfg *Config) Manager {
@@ -20,10 +24,9 @@ func NewManager(cfg *Config) Manager {
 		engine: gin.New(),
 	}
 
-	for _, fn := range ginFuncs {
-		m.register(fn(cfg))
+	for _, fn := range buildInMiddlewares {
+		m.Use(fn(cfg))
 	}
-	m.registerEndpoints()
 
 	return m
 }
@@ -31,22 +34,28 @@ func NewManager(cfg *Config) Manager {
 type manager struct {
 	cfg    *Config
 	engine *gin.Engine
-	lock   sync.RWMutex
 }
 
 func (m *manager) GetEngine() *gin.Engine {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
 	return m.engine
 }
 
-func (m *manager) register(fn gin.HandlerFunc) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (m *manager) Use(fn gin.HandlerFunc) {
 	m.engine.Use(fn)
 }
 
-func (m *manager) registerEndpoints() {
+func (m *manager) Run(addr ...string) error {
+	m.register()
+
+	err := m.engine.Run(addr...)
+	if err != nil {
+		return fmt.Errorf("failed to run http server: %w", err)
+	}
+	return nil
+}
+
+// register registers the endpoints.
+func (m *manager) register() {
 
 	if m.cfg.EnablePprof {
 		pprof.Register(m.engine)
