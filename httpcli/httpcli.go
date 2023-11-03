@@ -32,6 +32,7 @@ func (s *senderImpl) Do(req *http.Request) (*http.Response, error) {
 	return s.cli.Do(req)
 }
 
+//go:generate mockery --name Client --filename Client_mock.go --inpackage
 type Client interface {
 	// Request sends an HTTP request and returns an HTTP response, following
 	Request(ctx context.Context, req *http.Request) (resp *http.Response, err error)
