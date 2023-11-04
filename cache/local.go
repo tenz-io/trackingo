@@ -38,19 +38,24 @@ func (l *local) Get(ctx context.Context, key string) (raw string, err error) {
 	}
 
 	l.lock.RLock()
-	defer l.lock.RUnlock()
 
 	it, found := l.m[key]
 	if !found {
+		defer l.lock.RUnlock()
 		return "", ErrNotFound
 	}
 
 	if it == nil || time.Now().Unix() > it.expire {
+		l.lock.RUnlock()
+
+		l.lock.Lock()
+		defer l.lock.Unlock()
 		delete(l.m, key)
 		return "", ErrNotFound
+	} else {
+		defer l.lock.RUnlock()
+		return string(it.raw), nil
 	}
-
-	return string(it.raw), nil
 
 }
 
@@ -94,9 +99,15 @@ func (l *local) GetBlob(ctx context.Context, key string, output any) (err error)
 	}
 
 	l.lock.RLock()
-	defer l.lock.RUnlock()
+	it, found := l.m[key]
+	if !found {
+		defer l.lock.RUnlock()
+		return ErrNotFound
+	}
 
-	if it, found := l.m[key]; found && it != nil && time.Now().Unix() < it.expire {
+	if it != nil && time.Now().Unix() < it.expire {
+		defer l.lock.RUnlock()
+
 		r := bytes.NewReader(it.raw)
 		decoder := gob.NewDecoder(r)
 		if err = decoder.Decode(output); err != nil {
@@ -104,9 +115,14 @@ func (l *local) GetBlob(ctx context.Context, key string, output any) (err error)
 		}
 		return nil
 	} else {
+		l.lock.RUnlock()
+
+		l.lock.Lock()
+		defer l.lock.Unlock()
 		delete(l.m, key)
 		return ErrNotFound
 	}
+
 }
 
 func (l *local) SetBlob(ctx context.Context, key string, val any, expire time.Duration) (err error) {
