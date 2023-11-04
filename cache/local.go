@@ -15,13 +15,15 @@ type item struct {
 }
 
 type local struct {
-	m    map[string]*item
-	lock sync.RWMutex
+	m       map[string]*item
+	nowFunc func() time.Time
+	lock    sync.RWMutex
 }
 
 func NewLocal() Manager {
 	return &local{
-		m: make(map[string]*item),
+		m:       make(map[string]*item),
+		nowFunc: time.Now,
 	}
 }
 
@@ -45,16 +47,25 @@ func (l *local) Get(ctx context.Context, key string) (raw string, err error) {
 		return "", ErrNotFound
 	}
 
-	if it == nil || time.Now().Unix() > it.expire {
+	if it == nil {
 		l.lock.RUnlock()
 
 		l.lock.Lock()
 		defer l.lock.Unlock()
 		delete(l.m, key)
 		return "", ErrNotFound
-	} else {
+	}
+
+	if it.expire == 0 || l.nowFunc().Unix() < it.expire {
 		defer l.lock.RUnlock()
 		return string(it.raw), nil
+	} else {
+		l.lock.RUnlock()
+
+		l.lock.Lock()
+		defer l.lock.Unlock()
+		delete(l.m, key)
+		return "", ErrNotFound
 	}
 
 }
@@ -69,7 +80,7 @@ func (l *local) Set(ctx context.Context, key string, raw string, expire time.Dur
 
 	l.m[key] = &item{
 		raw:    []byte(raw),
-		expire: time.Now().Add(expire).Unix(),
+		expire: l.expireAt(expire),
 	}
 	return nil
 }
@@ -87,7 +98,7 @@ func (l *local) SetNx(ctx context.Context, key string, raw string, expire time.D
 	} else {
 		l.m[key] = &item{
 			raw:    []byte(raw),
-			expire: time.Now().Add(expire).Unix(),
+			expire: l.expireAt(expire),
 		}
 		return false, nil
 	}
@@ -105,7 +116,16 @@ func (l *local) GetBlob(ctx context.Context, key string, output any) (err error)
 		return ErrNotFound
 	}
 
-	if it != nil && time.Now().Unix() < it.expire {
+	if it == nil {
+		l.lock.RUnlock()
+
+		l.lock.Lock()
+		defer l.lock.Unlock()
+		delete(l.m, key)
+		return ErrNotFound
+	}
+
+	if it.expire == 0 || l.nowFunc().Unix() < it.expire {
 		defer l.lock.RUnlock()
 
 		r := bytes.NewReader(it.raw)
@@ -141,7 +161,7 @@ func (l *local) SetBlob(ctx context.Context, key string, val any, expire time.Du
 
 	l.m[key] = &item{
 		raw:    buf.Bytes(),
-		expire: time.Now().Add(expire).Unix(),
+		expire: l.expireAt(expire),
 	}
 	return nil
 
@@ -169,7 +189,7 @@ func (l *local) Expire(ctx context.Context, key string, expire time.Duration) (e
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	if it, ok := l.m[key]; ok && it != nil {
-		it.expire = time.Now().Add(expire).Unix()
+		it.expire = l.expireAt(expire)
 		return nil
 	} else {
 		return ErrNotFound
@@ -180,4 +200,12 @@ func (l *local) Expire(ctx context.Context, key string, expire time.Duration) (e
 func (l *local) Eval(ctx context.Context, script string, keys []string, args ...any) (val any, err error) {
 	// ignore
 	return nil, fmt.Errorf("not support")
+}
+
+func (l *local) expireAt(expire time.Duration) int64 {
+	if expire == 0 {
+		return 0
+	} else {
+		return l.nowFunc().Add(expire).Unix()
+	}
 }
