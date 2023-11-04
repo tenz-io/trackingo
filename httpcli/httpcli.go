@@ -178,14 +178,21 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 	var (
 		path       = req.URL.Path
 		cmd        = util.If(path == "", "/", path)
-		reqBody    = captureRequest(ctx, req)
 		code       = 0
-		rec        = monitor.BeginRecord(ctx, cmd)
-		trafficRec *logger.TrafficRec
+		respHeader http.Header
+		respCode   int
 	)
 
+	if c.enableMetrics {
+		rec := monitor.BeginRecord(ctx, cmd)
+		defer func() {
+			rec.EndWithError(err)
+		}()
+	}
+
 	if c.enableTraffic {
-		trafficRec = logger.StartTrafficRec(ctx, &logger.TrafficReq{
+		reqBody := captureRequest(ctx, req)
+		trafficRec := logger.StartTrafficRec(ctx, &logger.TrafficReq{
 			Cmd: cmd,
 			Req: printPayload(req.Header, reqBody),
 		}, logger.Fields{
@@ -195,29 +202,10 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 			"params":    req.URL.Query(),
 			"body_size": len(reqBody),
 		})
-	}
-
-	defer func() {
-		code = common.ErrorCode(err)
-		respBody := captureResponse(ctx, resp)
-		if c.enableMetrics {
-			rec.EndWithCode(code)
-			mon := monitor.FromContext(ctx)
-			mon.Sample(ctx, cmd, code, float64(len(reqBody)), "reqLen")
-			if resp != nil {
-				mon.Sample(ctx, cmd, code, float64(len(respBody)), "respLen")
-			}
-
-		}
-		if c.enableTraffic {
+		defer func() {
 			var (
-				respHeader http.Header
-				respCode   int
+				respBody = captureResponse(ctx, resp)
 			)
-			if resp != nil {
-				respHeader = resp.Header
-				respCode = resp.StatusCode
-			}
 			trafficRec.End(&logger.TrafficResp{
 				Code: common.ErrorCode(err),
 				Msg:  common.ErrorMsg(err),
@@ -227,9 +215,8 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 				"header":    respHeader,
 				"body_size": len(respBody),
 			})
-
-		}
-	}()
+		}()
+	}
 
 	resp, err = c.sender.Do(req)
 	if err != nil {
@@ -239,6 +226,9 @@ func (c *client) Request(ctx context.Context, req *http.Request) (resp *http.Res
 	if resp.StatusCode != http.StatusOK {
 		return resp, common.NewValError(code, fmt.Errorf("response with status: %d", resp.StatusCode))
 	}
+
+	respHeader = resp.Header
+	respCode = resp.StatusCode
 
 	return resp, nil
 }
