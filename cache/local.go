@@ -21,10 +21,14 @@ type local struct {
 }
 
 func NewLocal() Manager {
-	return &local{
+	lm := &local{
 		m:       make(map[string]*item),
 		nowFunc: time.Now,
 	}
+
+	lm.startEvict(5 * time.Minute)
+
+	return lm
 }
 
 func (l *local) active() bool {
@@ -32,6 +36,37 @@ func (l *local) active() bool {
 		return false
 	}
 	return true
+}
+
+// startEvict evict expired with interval
+func (l *local) startEvict(interval time.Duration) {
+	if !l.active() {
+		return
+	}
+
+	go func() {
+		for {
+			l.evict()
+			time.Sleep(interval)
+		}
+	}()
+}
+
+// evict expired items
+func (l *local) evict() {
+	if !l.active() {
+		return
+	}
+
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	now := l.nowFunc().Unix()
+	for k, v := range l.m {
+		if v.expire != 0 && now > v.expire {
+			delete(l.m, k)
+		}
+	}
 }
 
 func (l *local) Get(ctx context.Context, key string) (raw string, err error) {
