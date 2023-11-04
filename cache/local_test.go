@@ -2,15 +2,13 @@ package cache
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 )
 
 func Test_local_Get(t *testing.T) {
 	type fields struct {
-		m    map[string]*item
-		lock sync.RWMutex
+		m map[string]*item
 	}
 	type args struct {
 		ctx context.Context
@@ -26,8 +24,7 @@ func Test_local_Get(t *testing.T) {
 		{
 			name: "when key not found then return ErrNotFound",
 			fields: fields{
-				m:    map[string]*item{},
-				lock: sync.RWMutex{},
+				m: map[string]*item{},
 			},
 			args: args{
 				ctx: context.Background(),
@@ -45,7 +42,6 @@ func Test_local_Get(t *testing.T) {
 						expire: time.Now().Unix() - 100000,
 					},
 				},
-				lock: sync.RWMutex{},
 			},
 			args: args{
 				ctx: context.Background(),
@@ -63,7 +59,6 @@ func Test_local_Get(t *testing.T) {
 						expire: time.Now().Unix() + 100000,
 					},
 				},
-				lock: sync.RWMutex{},
 			},
 			args: args{
 				ctx: context.Background(),
@@ -76,8 +71,7 @@ func Test_local_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &local{
-				m:    tt.fields.m,
-				lock: tt.fields.lock,
+				m: tt.fields.m,
 			}
 			gotRaw, err := l.Get(tt.args.ctx, tt.args.key)
 			if (err != nil) != tt.wantErr {
