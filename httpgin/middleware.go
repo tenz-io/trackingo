@@ -138,7 +138,7 @@ func applyTracking(cfg *Config) gin.HandlerFunc {
 			}).
 			WithIgnores(
 				"password",
-				"Authorization",
+				//"Authorization",
 			)
 		ctx = logger.WithTrafficEntry(ctx, te)
 
