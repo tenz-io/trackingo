@@ -125,14 +125,14 @@ func applyTracking(cfg *Config) gin.HandlerFunc {
 		// metrics
 		ctx = monitor.InitSingleFlight(ctx, url)
 
-		traceId := traceID()
+		requestId := RequestId(ctx)
+		ctx = WithRequestId(ctx, requestId)
 		le := logger.WithFields(logger.Fields{
 			"url": url,
-		}).WithTracing(traceId)
-
+		}).WithTracing(requestId)
 		ctx = logger.WithLogger(ctx, le)
 
-		te := logger.WithTrafficTracing(ctx, traceId).
+		te := logger.WithTrafficTracing(ctx, requestId).
 			WithFields(logger.Fields{
 				"url": url,
 			}).
@@ -141,8 +141,11 @@ func applyTracking(cfg *Config) gin.HandlerFunc {
 				//"Authorization",
 			)
 		ctx = logger.WithTrafficEntry(ctx, te)
-
 		WithContext(c, ctx)
+
+		defer func() {
+			c.Writer.Header().Set("X-Request-Id", requestId)
+		}()
 
 		c.Next()
 	}

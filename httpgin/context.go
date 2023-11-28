@@ -34,3 +34,28 @@ func newUUID() string {
 func traceID() string {
 	return strings.ReplaceAll(newUUID(), "-", "")
 }
+
+type requestIdCtxKeyType string
+
+const (
+	requestIdCtxKey = requestIdCtxKeyType("requestId_ctx_key")
+)
+
+// RequestId returns the value associated with this context for key, or nil
+func RequestId(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+
+	if requestId, ok := ctx.Value(requestIdCtxKey).(string); ok {
+		return requestId
+	}
+
+	return traceID()
+}
+
+// WithRequestId returns a copy of parent in which the value associated with key is val.
+func WithRequestId(ctx context.Context, requestId string) context.Context {
+	ctx = context.WithValue(ctx, requestIdCtxKey, requestId)
+	return ctx
+}
